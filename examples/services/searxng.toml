@@ -1,0 +1,6 @@
+# searxng: metasearch engine in Docker. The probe reads /healthz. Logs give engine errors and request lines.
+[[services]]
+name = "searxng"
+kind = "service"
+health_url = "http://127.0.0.1:8888/healthz"
+docker_container = "searxng"

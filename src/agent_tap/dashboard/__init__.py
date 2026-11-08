@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
 from ..core.config import Config, load_config
+from ..core.schema import service_kind_for
 from ..platform.scheduler import collect_scheduled_tasks_and_crons
 
 
@@ -54,6 +55,11 @@ def compute_dashboard_payload(
             s.end_time,
             COALESCE(JSON_EXTRACT(s.attributes, '$.harness'), 'unknown') AS harness,
             JSON_EXTRACT(s.attributes, '$.hermes.profile') AS hermes_profile,
+            JSON_EXTRACT(s.attributes, '$.service.kind') AS svc_kind,
+            JSON_EXTRACT(s.attributes, '$.service.status') AS svc_status,
+            JSON_EXTRACT(s.attributes, '$.service.endpoint') AS svc_endpoint,
+            JSON_EXTRACT(s.attributes, '$.service.latency_ms') AS svc_latency,
+            JSON_EXTRACT(s.attributes, '$.http.status_code') AS http_status,
             COALESCE(s.llm_token_count_prompt, JSON_EXTRACT(s.attributes, '$.llm.token_count.prompt'), 0) AS prompt_tok,
             COALESCE(s.llm_token_count_completion, JSON_EXTRACT(s.attributes, '$.llm.token_count.completion'), 0) AS comp_tok,
             COALESCE(JSON_EXTRACT(s.attributes, '$.hermes.estimated_cost_usd'), 0.0) AS cost_usd,
@@ -79,7 +85,24 @@ def compute_dashboard_payload(
         params.append(harness_filter)
 
     rows = con.execute(sql, tuple(params)).fetchall()
+    # Names present in the window, regardless of the active filter, so the dropdown keeps every choice.
+    seen = con.execute(
+        "SELECT COALESCE(JSON_EXTRACT(attributes, '$.harness'), 'unknown') AS h, "
+        "MAX(JSON_EXTRACT(attributes, '$.service.kind')) AS k FROM spans WHERE start_time >= ? GROUP BY h",
+        (cutoff_iso,),
+    ).fetchall()
     con.close()
+    cfg_kinds = config.service_kinds()
+    kinds: dict[str, str] = {}
+    available: dict[str, dict[str, Any]] = {}
+    for sr in seen:
+        nm_ = str(sr["h"])
+        kd_ = sr["k"] or service_kind_for(nm_, cfg_kinds)
+        kinds[nm_] = kd_
+        available[nm_] = {"name": nm_, "kind": kd_}
+    for sv in config.services:
+        if sv.get("name"):
+            available.setdefault(str(sv["name"]), {"name": str(sv["name"]), "kind": str(sv.get("kind", "service"))})
 
     # Global KPIs
     all_sessions: set[str] = set()
@@ -97,7 +120,7 @@ def compute_dashboard_payload(
     total_error_events = 0
     total_cost_usd = 0.0
 
-    # Per-harness & Hermes 15-profile stats
+    # Per-harness stats
     harness_stats: dict[str, dict[str, Any]] = defaultdict(
         lambda: {
             "spans": 0,
@@ -115,18 +138,21 @@ def compute_dashboard_payload(
             "latencies_ms": [],
         }
     )
-    hermes_profile_stats: dict[str, dict[str, Any]] = defaultdict(
+    # Per-service stats (non-harness kinds)
+    service_stats: dict[str, dict[str, Any]] = defaultdict(
         lambda: {
-            "spans": 0,
-            "sessions": set(),
-            "turns": 0,
-            "tool_calls": 0,
-            "skill_calls": 0,
-            "error_spans": 0,
-            "error_events": 0,
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "cost_usd": 0.0,
+            "checks": 0,
+            "requests": 0,
+            "errors": 0,
+            "probe_lat": [],
+            "req_lat": [],
+            "status": "unknown",
+            "status_at": "",
+            "endpoint": "",
+            "last_seen": "",
+            "trace_id": "",
+            "error_trace_id": "",
+            "err_at": "",
         }
     )
 
@@ -187,6 +213,10 @@ def compute_dashboard_payload(
         if sid:
             all_sessions.add(f"{h}:{sid}")
 
+        if r["svc_kind"]:
+            kinds[h] = str(r["svc_kind"])
+        else:
+            kinds.setdefault(h, service_kind_for(h, cfg_kinds))
         hs = harness_stats[h]
         hs["spans"] += 1
         hs["traces"].add(trace_id)
@@ -234,6 +264,38 @@ def compute_dashboard_payload(
                 pass
 
         is_err = r["status_code"] == "ERROR" or bool(r["err_class"])
+
+        if kinds[h] != "harness":
+            sv = service_stats[h]
+            is_probe = sk == "SERVICE" and bool(r["svc_status"])
+            if is_probe:
+                sv["checks"] += 1
+                if r["svc_latency"] is not None:
+                    try:
+                        sv["probe_lat"].append(float(r["svc_latency"]))
+                    except Exception:
+                        pass
+                elif dur > 0:
+                    sv["probe_lat"].append(dur)
+                if st_time >= sv["status_at"]:
+                    sv["status_at"] = st_time
+                    sv["status"] = str(r["svc_status"])
+                    if r["svc_endpoint"]:
+                        sv["endpoint"] = str(r["svc_endpoint"])
+            else:
+                sv["requests"] += 1
+                if dur > 0:
+                    sv["req_lat"].append(dur)
+                if r["svc_endpoint"] and not sv["endpoint"]:
+                    sv["endpoint"] = str(r["svc_endpoint"])
+            if is_err:
+                sv["errors"] += 1
+            if st_time >= sv["last_seen"]:
+                sv["last_seen"] = st_time
+                sv["trace_id"] = trace_id
+            if is_err and st_time >= sv["err_at"]:
+                sv["err_at"] = st_time
+                sv["error_trace_id"] = trace_id
 
         if sk == "TOOL":
             total_tool_calls += 1
@@ -322,32 +384,14 @@ def compute_dashboard_payload(
                 msg_sample = str(r["status_message"] or r["output_val"] or "")
                 em["sample_msg"] = msg_sample[:240]
 
-        if h == "hermes":
-            p_key = prof or "default"
-            hp = hermes_profile_stats[p_key]
-            hp["spans"] += 1
-            if sid:
-                hp["sessions"].add(sid)
-            if is_turn:
-                hp["turns"] += 1
-            if sk == "TOOL":
-                hp["tool_calls"] += 1
-            if is_skill_span:
-                hp["skill_calls"] += 1
-            hp["prompt_tokens"] += ptok
-            hp["completion_tokens"] += ctok
-            hp["cost_usd"] += cost
-            if is_err:
-                hp["error_spans"] += 1
-                hp["error_events"] += int(r["err_count"] or 1)
 
     # Sort latencies
     all_latencies.sort()
     all_ttfts.sort()
 
-    # Format Table 1: Harnesses
+    # Harness activity (kind == harness only)
     harnesses_table = []
-    for h in sorted(harness_stats.keys()):
+    for h in sorted(k for k in harness_stats if kinds.get(k) == "harness"):
         d = harness_stats[h]
         lats = sorted(d["latencies_ms"])
         harnesses_table.append(
@@ -372,28 +416,37 @@ def compute_dashboard_payload(
             }
         )
 
-    hermes_profiles_table = []
-    for prof in sorted(hermes_profile_stats.keys()):
-        d = hermes_profile_stats[prof]
-        hermes_profiles_table.append(
+    # Running services and gateways (kind != harness)
+    cfg_by_name = {str(x.get("name")): x for x in config.services if x.get("name")}
+    names = {k for k, v in kinds.items() if v != "harness"} & set(service_stats)
+    names |= {n for n, v in available.items() if v["kind"] != "harness" and harness_filter in (None, "all", n)}
+    services_table = []
+    for name in sorted(names):
+        d = service_stats[name]
+        lats = sorted(d["req_lat"] or d["probe_lat"])
+        cfgsvc = cfg_by_name.get(name, {})
+        endpoint = d["endpoint"] or str(cfgsvc.get("health_url") or cfgsvc.get("docker_container") or "-")
+        services_table.append(
             {
-                "profile": prof,
-                "sessions": len(d["sessions"]),
-                "spans": d["spans"],
-                "turns": d["turns"],
-                "tool_calls": d["tool_calls"],
-                "skill_calls": d["skill_calls"],
-                "total_tokens": d["prompt_tokens"] + d["completion_tokens"],
-                "prompt_tokens": d["prompt_tokens"],
-                "completion_tokens": d["completion_tokens"],
-                "cost_usd": round(d["cost_usd"], 4),
-                "error_spans": d["error_spans"],
-                "error_events": d["error_events"],
-                "phoenix_filter": f"harness == 'hermes' and hermes.profile == '{prof}'",
+                "service": name,
+                "kind": kinds.get(name) or available.get(name, {}).get("kind", "service"),
+                "status": d["status"],
+                "endpoint": endpoint,
+                "checks": d["checks"],
+                "requests": d["requests"],
+                "errors": d["errors"],
+                "p50_ms": _percentile(lats, 0.50),
+                "p90_ms": _percentile(lats, 0.90),
+                "last_seen": d["last_seen"],
+                "trace_id": d["error_trace_id"] or d["trace_id"],
+                "phoenix_filter": f"harness == '{name}'",
             }
         )
+    service_summary = {"total": len(services_table)}
+    for st_name in ("healthy", "degraded", "down", "unknown"):
+        service_summary[st_name] = sum(1 for x in services_table if x["status"] == st_name)
 
-    # Format Table 2: Top Tools Leaderboard
+    # Tool usage
     tools_table = []
     for (h, tname), d in sorted(tool_map.items(), key=lambda x: x[1]["calls"], reverse=True)[:50]:
         lats = sorted(d["latencies_ms"])
@@ -415,7 +468,7 @@ def compute_dashboard_payload(
             }
         )
 
-    # Format Table 3: Most Used / Loaded Skills
+    # Skill invocations
     skills_ondemand_table = []
     for (h, sname), d in sorted(skill_ondemand_map.items(), key=lambda x: x[1]["count"], reverse=True)[:40]:
         skills_ondemand_table.append(
@@ -447,7 +500,7 @@ def compute_dashboard_payload(
             }
         )
 
-    # Format Table 4: Crashes & Operational Error Classes
+    # Crashes, timeouts and operational errors
     errors_table = []
     for (h, prof, ec), d in sorted(error_map.items(), key=lambda x: x[1]["events"], reverse=True):
         errors_table.append(
@@ -465,7 +518,7 @@ def compute_dashboard_payload(
             }
         )
 
-    # Format Table 5: Parent-to-Child Correlation Explorer
+    # Parent-to-child correlation
     scon = sqlite3.connect(f"file:{state_db.as_posix()}?mode=ro", uri=True, timeout=5.0)
     scon.row_factory = sqlite3.Row
     link_summary_rows = scon.execute(
@@ -556,7 +609,12 @@ def compute_dashboard_payload(
             "correlated_runs": sum(int(r["cnt"]) for r in link_summary_rows),
         },
         "harnesses": harnesses_table,
-        "hermes_profiles": hermes_profiles_table,
+        "services": services_table,
+        "service_summary": service_summary,
+        "available": {
+            "harnesses": sorted(n for n, v in available.items() if v["kind"] == "harness"),
+            "services": sorted((v for v in available.values() if v["kind"] != "harness"), key=lambda v: v["name"]),
+        },
         "top_tools": tools_table,
         "skills_ondemand": skills_ondemand_table,
         "skills_injected": skills_injected_table,
@@ -639,6 +697,13 @@ def create_dashboard_app(config: Config | None = None) -> FastAPI:
             for r in rows[:limit]
         ]
         return JSONResponse({"trace_id": trace_id, "spans": spans, "truncated": len(rows) > limit})
+
+    @app.get("/api/bug-report")
+    def api_bug_report(service: Optional[str] = Query(None), error_text: Optional[str] = Query(None)) -> JSONResponse:
+        from ..bugreport import build_bundle, issue_url, render_markdown
+
+        bundle = build_bundle(cfg, error_text=error_text, service=service)
+        return JSONResponse({"markdown": render_markdown(bundle), "url": issue_url(bundle)})
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> HTMLResponse:

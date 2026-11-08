@@ -1,4 +1,4 @@
-"""Interactive first-run setup: pick harnesses, confirm paths, choose prompt-text storage."""
+"""Interactive first-run setup: pick harnesses and services, confirm paths, choose prompt-text storage."""
 from __future__ import annotations
 
 import json
@@ -11,8 +11,10 @@ from typing import Any, Callable
 
 from .adapters.base import Context, builtin_adapters
 from .adapters.declarative import load_declarative_adapters
+from .adapters.service import load_service_adapters
 from .core import paths
 from .core.config import Config
+from .core.schema import service_kind_for
 
 
 def examples_dir() -> Path:
@@ -20,7 +22,7 @@ def examples_dir() -> Path:
 
 
 def detect_harnesses(cfg: Config) -> dict[str, bool]:
-    """Map every known harness name to whether data exists on this machine."""
+    """Map every known harness and service name to whether it is present on this machine."""
     ctx = Context(cfg)
     found: dict[str, bool] = {}
     for name, factory in builtin_adapters().items():
@@ -33,7 +35,17 @@ def detect_harnesses(cfg: Config) -> dict[str, bool]:
             found[ad.name] = bool(ad.discover(ctx))
         except Exception:
             found[ad.name] = False
+    for ad in load_service_adapters(cfg):
+        try:
+            found[ad.name] = bool(ad.discover(ctx))
+        except Exception:
+            found[ad.name] = False
     return found
+
+
+def kinds_for(cfg: Config, names: list[str]) -> dict[str, str]:
+    configured = cfg.service_kinds()
+    return {n: service_kind_for(n, configured) for n in names}
 
 
 def _toml_value(v: Any) -> str:
@@ -46,11 +58,28 @@ def _toml_value(v: Any) -> str:
     return json.dumps(str(v), ensure_ascii=False)  # JSON string escapes are valid TOML basic strings
 
 
+def _table_lines(header: str, table: dict[str, Any]) -> list[str]:
+    lines = [header] + [f"{k} = {_toml_value(v)}" for k, v in table.items() if not isinstance(v, dict)]
+    for k, v in table.items():
+        if isinstance(v, dict) and v:
+            lines += ["", *_table_lines(f"[{header.strip('[]')}.{k}]", v)]
+    return lines
+
+
+def _is_array_of_tables(v: Any) -> bool:
+    return isinstance(v, list) and bool(v) and all(isinstance(x, dict) for x in v)
+
+
 def render_toml(data: dict[str, Any]) -> str:
-    lines = [f"{k} = {_toml_value(v)}" for k, v in data.items() if not isinstance(v, dict)]
+    """Write scalars, then [tables], then [[arrays of tables]] (used for [[services]])."""
+    lines = [f"{k} = {_toml_value(v)}" for k, v in data.items() if not isinstance(v, dict) and not _is_array_of_tables(v)]
     for k, v in data.items():
         if isinstance(v, dict) and v:
-            lines += ["", f"[{k}]"] + [f"{kk} = {_toml_value(vv)}" for kk, vv in v.items()]
+            lines += ["", *_table_lines(f"[{k}]", v)]
+    for k, v in data.items():
+        if _is_array_of_tables(v):
+            for entry in v:
+                lines += ["", *_table_lines(f"[[{k}]]", entry)]
     return "\n".join(lines) + "\n"
 
 
@@ -69,7 +98,7 @@ def _parse_selection(text: str, names: list[str], default: list[str]) -> list[st
         elif tok in names:
             chosen.append(tok)
         else:
-            raise ValueError(f"unknown harness: {tok}")
+            raise ValueError(f"unknown harness or service: {tok}")
     return list(dict.fromkeys(chosen))
 
 
@@ -103,12 +132,16 @@ def run_init(
     if harnesses is not None:
         unknown = [h for h in harnesses if h not in names]
         if unknown:
-            raise ValueError(f"unknown harness(es): {', '.join(unknown)}; known: {', '.join(names)}")
+            raise ValueError(f"unknown harness or service: {', '.join(unknown)}; known: {', '.join(names)}")
         selected = list(harnesses)
     elif interactive:
-        out("Harnesses (data detected on this machine are marked *):")
-        for i, n in enumerate(names, 1):
-            out(f"  {i}. [{'*' if detected[n] else ' '}] {n}")
+        kinds = kinds_for(cfg, names)
+        out("Pick what to monitor. Entries found on this machine are marked *.")
+        for label, group in (("Agent harnesses", "harness"), ("Services and gateways", None)):
+            out(f"{label}:")
+            for i, n in enumerate(names, 1):
+                if (kinds[n] == "harness") == (group == "harness"):
+                    out(f"  {i}. [{'*' if detected[n] else ' '}] {n}")
         while True:
             try:
                 selected = _parse_selection(
@@ -119,7 +152,9 @@ def run_init(
                 out(str(e))
     else:
         selected = default_sel
-    data["enabled_harnesses"] = selected
+    data.pop("enabled_harnesses", None)
+    data.pop("adapters", None)
+    data["enabled_services"] = selected
 
     if interactive and harnesses is None:
         if "omniroute" in selected:

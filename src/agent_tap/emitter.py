@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from .core.schema import Span, SpanContext, SpanEvent, SpanKind, SpanStatusCode
+from .core.schema import Span, SpanContext, SpanEvent, SpanKind, SpanStatusCode, service_kind_for
 
 from .redact import redact_obj, redact_text
 
@@ -116,6 +116,8 @@ def build_span(
         sc = SpanStatusCode.UNSET
 
     clean_attrs: dict[str, Any] = {}
+    if attributes and attributes.get("harness") and "service.kind" not in attributes:
+        attributes = {**attributes, "service.kind": service_kind_for(str(attributes["harness"]))}
     if attributes:
         src = redact_obj(attributes)
         if not STORE_PROMPT_TEXT:

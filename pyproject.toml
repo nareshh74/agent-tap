@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tap"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local multi-agent usage analytics and operational debugging for Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven, OmniRoute, Aider and Cline: error taxonomy, parent-to-child trace correlation, cron monitoring, local SQLite, no cloud"
 readme = "README.md"
 license = { text = "MIT" }
@@ -50,7 +50,7 @@ omniroute = "agent_tap.adapters.omniroute:OmniRouteAdapter"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agent_tap = ["dashboard/static/*", "examples/*.toml"]
+agent_tap = ["dashboard/static/*", "examples/*.toml", "examples/services/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

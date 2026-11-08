@@ -18,6 +18,9 @@ def home(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_TAP_CONFIG", str(tmp_path / "cfg" / "config.toml"))
     monkeypatch.setattr(onboarding, "can_prompt", lambda: False)
     monkeypatch.setattr("agent_tap.adapters.omniroute.OmniRouteAdapter._docker", staticmethod(lambda: None))
+    monkeypatch.setattr("agent_tap.adapters.service.http_probe", lambda *a, **k: (None, 0.0, "unreachable", "refused"))
+    monkeypatch.setattr("agent_tap.adapters.service.docker_available", lambda: False)
+    monkeypatch.setattr("agent_tap.adapters.service.process_running", lambda n: False)
     (tmp_path / ".codex").mkdir()
     (tmp_path / ".claude" / "projects").mkdir(parents=True)
     return tmp_path
@@ -49,14 +52,14 @@ def test_interactive_selection_and_prompt_choice(home):
     pick = f"{names.index('claude-code') + 1}, codex"
     path = onboarding.run_init(_cfg(home), ask=_responder(enable=pick, store="y"), out=lambda _: None)
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    assert data["enabled_harnesses"] == ["claude-code", "codex"]
+    assert data["enabled_services"] == ["claude-code", "codex"]
     assert data["store_prompt_text"] is True
 
 
 def test_interactive_default_enter_preselects_detected(home):
     path = onboarding.run_init(_cfg(home), ask=lambda _: "", out=lambda _: None)
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    assert set(data["enabled_harnesses"]) == {"claude-code", "codex"}
+    assert set(data["enabled_services"]) == {"claude-code", "codex"}
     assert data["store_prompt_text"] is False
 
 
@@ -66,7 +69,7 @@ def test_custom_omniroute_path_recorded(home):
     path = onboarding.run_init(_cfg(home), ask=ask, out=lambda _: None)
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     assert data["paths"]["omniroute"] == "/data/omni"
-    assert data["enabled_harnesses"] == ["omniroute"]
+    assert data["enabled_services"] == ["omniroute"]
 
 
 def test_init_flags_never_prompt(home, capsys):
@@ -74,14 +77,14 @@ def test_init_flags_never_prompt(home, capsys):
     assert rc == 0
     cfg_path = home / "cfg" / "config.toml"
     data = tomllib.loads(cfg_path.read_text(encoding="utf-8"))
-    assert data["enabled_harnesses"] == ["codex", "aider"] and data["store_prompt_text"] is False
+    assert data["enabled_services"] == ["codex", "aider"] and data["store_prompt_text"] is False
     assert (load_config(None).adapters_dir / "aider.toml").exists()
 
 
 def test_init_non_interactive_uses_detected_and_unknown_harness_errors(home, capsys):
     assert main(["init", "--non-interactive"]) == 0
     data = tomllib.loads((home / "cfg" / "config.toml").read_text(encoding="utf-8"))
-    assert set(data["enabled_harnesses"]) == {"claude-code", "codex"}
+    assert set(data["enabled_services"]) == {"claude-code", "codex"}
     assert main(["init", "--harnesses", "nope"]) == 2
 
 
@@ -120,4 +123,4 @@ def test_service_install_with_harnesses_writes_config_first(home, monkeypatch):
     called = {}
     monkeypatch.setattr("agent_tap.platform.service.service_main", lambda *a, **k: (called.setdefault("ok", True) and 0, ""))
     assert main(["service", "install", "--harnesses", "codex"]) == 0
-    assert called and tomllib.loads((home / "cfg" / "config.toml").read_text(encoding="utf-8"))["enabled_harnesses"] == ["codex"]
+    assert called and tomllib.loads((home / "cfg" / "config.toml").read_text(encoding="utf-8"))["enabled_services"] == ["codex"]

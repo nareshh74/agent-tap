@@ -1,0 +1,52 @@
+name: Service or harness adapter request
+description: Ask agent-tap to monitor a new service or agent harness
+title: "[adapter] "
+labels: ["enhancement", "adapter"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Service or harness name
+      placeholder: grafana, aider, my-llm-proxy
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: A harness is an agent that runs sessions and tool calls. A gateway routes model traffic. A service is anything else.
+      options:
+        - harness
+        - gateway
+        - service
+    validations:
+      required: true
+  - type: input
+    id: health_url
+    attributes:
+      label: Health URL
+      description: An HTTP endpoint that returns 200 when the service is healthy, if one exists.
+      placeholder: http://127.0.0.1:8080/health
+  - type: input
+    id: docker_container
+    attributes:
+      label: Docker container name
+      description: Name from `docker ps`, if the service runs in Docker.
+  - type: input
+    id: log_path
+    attributes:
+      label: Log or data path
+      description: Where the service writes logs or session files. Replace your home directory with `~`.
+  - type: textarea
+    id: sample_logs
+    attributes:
+      label: Sample log lines
+      description: Five to ten sanitized lines, including at least one error line.
+      render: text
+  - type: textarea
+    id: why
+    attributes:
+      label: What do you want to learn from it?
+      description: For example error rates, latency, request counts, or session activity.
+    validations:
+      required: true

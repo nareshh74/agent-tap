@@ -17,6 +17,7 @@ class SpanKind(str, Enum):
     RERANKER = "RERANKER"
     EVALUATOR = "EVALUATOR"
     GUARDRAIL = "GUARDRAIL"
+    SERVICE = "SERVICE"
     UNKNOWN = "UNKNOWN"
 
 
@@ -52,3 +53,21 @@ class Span:
     attributes: dict[str, Any] = field(default_factory=dict)
     events: list[SpanEvent] = field(default_factory=list)
     conversation: Any = None
+
+
+SERVICE_KINDS = ("harness", "gateway", "service")
+# Built-in non-harness services. Anything not listed here or in config [[services]] is a harness.
+BUILTIN_SERVICE_KINDS = {
+    "omniroute": "gateway",
+    "freellmapi": "gateway",
+    "everos": "service",
+    "searxng": "service",
+    "firecrawl": "service",
+}
+
+
+def service_kind_for(name: str, configured: dict[str, str] | None = None) -> str:
+    """Return "harness", "gateway" or "service" for a span's harness/service name."""
+    if configured and name in configured:
+        return configured[name]
+    return BUILTIN_SERVICE_KINDS.get(name, "harness")

@@ -88,8 +88,10 @@ def test_doctor_on_empty_home(home, capsys):
     out = json.loads(capsys.readouterr().out)
     assert rc == 0 and out["store_prompt_text"] is False
     assert out["spans_db"]["exists"] is False
-    assert set(out["adapters"]) >= {"raven", "hermes", "claude-code", "codex", "copilot-cli", "omniroute"}
-    assert all(v == "no data found" for k, v in out["adapters"].items() if k != "omniroute")  # omniroute may find a docker container
+    harnesses = {"raven", "hermes", "claude-code", "codex", "copilot-cli"}
+    services = {"omniroute", "everos", "searxng", "freellmapi", "firecrawl"}
+    assert set(out["adapters"]) >= harnesses | services
+    assert all(out["adapters"][k] == "no data found" for k in harnesses)  # services may answer on a dev machine
 
 
 def test_query_preset_and_readonly(home, capsys):

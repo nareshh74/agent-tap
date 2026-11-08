@@ -1,0 +1,109 @@
+name: Bug report
+description: Report a problem with agent-tap, a built-in adapter, or a monitored service
+title: "[bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Run `agent-tap bug-report` first. It prints a redacted diagnostic bundle that replaces your home path and known secret patterns. Check the bundle before you paste it.
+  - type: dropdown
+    id: service
+    attributes:
+      label: Service or harness
+      description: Which service or agent harness does the problem involve?
+      options:
+        - claude-code
+        - codex
+        - copilot-cli
+        - hermes
+        - raven
+        - omniroute
+        - everos
+        - searxng
+        - freellmapi
+        - firecrawl
+        - aider
+        - cline
+        - other service
+        - other harness
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - WSL2
+    validations:
+      required: true
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      options:
+        - pipx
+        - uv tool
+        - pip
+        - from source
+        - other
+  - type: input
+    id: version
+    attributes:
+      label: agent-tap version
+      description: Output of `agent-tap --version`.
+      placeholder: agent-tap 0.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: config_type
+    attributes:
+      label: Adapter type
+      options:
+        - built-in adapter
+        - declarative TOML adapter
+        - "[[services]] entry"
+        - Python plugin
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic bundle
+      description: Paste the output of `agent-tap bug-report --service <name>`.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error stack or traceback
+      description: Paste the full traceback or error message. Remove secrets first.
+      render: shell
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `agent-tap run --once`
+        2. Open the dashboard
+        3. See the error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed tokens, API keys, cookies, and private file contents from everything I pasted.
+          required: true
+        - label: I searched existing issues for the same problem.

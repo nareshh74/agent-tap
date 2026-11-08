@@ -315,7 +315,7 @@ class OmniRouteAdapter:
     @staticmethod
     def _dir(ctx: Context) -> Optional[Path]:
         o = ctx.dir_for("omniroute")
-        if o:
+        if o and o.exists():
             return o
         found = paths.omniroute_dirs(ctx.config.wsl_discovery)
         return found[0] if found else None
@@ -326,10 +326,21 @@ class OmniRouteAdapter:
 
         return shutil.which("docker") is not None
 
+    kind = "gateway"
+
+    @staticmethod
+    def _probe(ctx: Context, state: StateStore, store: PhoenixEmitter, cutoff_ts: float) -> PollResult:
+        from .service import ServiceAdapter, ServiceSpec
+
+        url = os.environ.get("AGENT_TAP_OMNIROUTE_URL", "http://127.0.0.1:20128/api/health")
+        res = ServiceAdapter(ServiceSpec("omniroute", "gateway", health_url=url)).poll(ctx, state, store, cutoff_ts)
+        return {"omniroute_probe": res["omniroute"]}
+
     def poll(self, ctx: Context, state: StateStore, store: PhoenixEmitter, cutoff_ts: float) -> PollResult:
         global _DIR
         _DIR = self._dir(ctx)
         out: PollResult = {}
+        out.update(self._probe(ctx, state, store, cutoff_ts))
         try:
             out["omniroute"] = poll_omniroute(state, store, cutoff_ts)
         except Exception as e:

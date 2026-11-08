@@ -1,187 +1,256 @@
 # agent-tap
 
-**Local multi-agent usage analytics + operational debugging for Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven, OmniRoute, Aider and Cline.**
+agent-tap is a local usage analytics and operational monitoring tool for running services and coding-agent harnesses. It reads the logs, databases and health endpoints that Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven, OmniRoute, EverOS, SearXNG, FreeLLMAPI, Firecrawl, Aider, Cline and your own services already produce, and stores them in one SQLite file.
 
-agent-tap tails the logs and databases your coding agents already write and correlates sessions, tool calls, skills, runtime errors, parent-to-child subagent traces and scheduled runs into one local SQLite file, with a live dashboard on `http://127.0.0.1:6007`. No cloud, no telemetry, no Docker, no SDK to install in your agents.
-
-- **Usage analytics**: sessions, spans, tokens, tool and skill leaderboards per harness.
-- **Operational debugging**: a normalized error taxonomy, parent-to-child trace trees, scheduled-task and cron monitoring, per-source health.
-- **Local and private**: prompt text is **not** stored unless you opt in ([docs/privacy.md](docs/privacy.md)). Runtime dependencies are `platformdirs`, `fastapi` and `uvicorn`.
-- **Extensible**: six built-in adapters, a declarative TOML adapter for anything else, and a Python entry-point plugin API.
+A dashboard at `http://127.0.0.1:6007` shows usage, errors, parent-to-child traces and scheduled runs. Nothing leaves your machine, and prompt text is off by default. In this document, a harness is a coding agent program such as Claude Code or Codex.
 
 <p align="center">
-  <a href="assets/agent-tap-demo.mp4"><img src="assets/agent-tap-demo.gif" alt="agent-tap demo: dashboard, error classes, scheduled tasks and a parent-to-child trace drawer" width="800"></a>
+  <a href="assets/agent-tap-demo.mp4"><img src="assets/agent-tap-demo.gif" alt="agent-tap demo: harness activity, running services, error classes, scheduled tasks and a parent-to-child trace drawer" width="800"></a>
 </p>
 
-[Watch the narrated walkthrough (MP4, 60 s)](assets/agent-tap-demo.mp4). The data shown is synthetic.
+[Watch the narrated walkthrough (MP4, 60 seconds)](assets/agent-tap-demo.mp4). The data shown is synthetic.
 
-| Usage analytics across harnesses | Trace drawer and scheduled tasks |
+| Harness activity and running services | Scheduled tasks and the trace drawer |
 |---|---|
-| ![Dashboard overview with KPI cards and per-harness table](assets/dashboard-overview.png) | ![Scheduled tasks and crons with the parent-to-child trace drawer open](assets/trace-drawer-and-crons.png) |
+| ![Dashboard overview with KPI cards, the Harness Activity table and the Running Services & Gateways table](assets/dashboard-overview.png) | ![Scheduled Tasks & Crons table with the parent-to-child trace drawer open](assets/trace-drawer-and-crons.png) |
 
 ## Get started
 
-Python 3.11+ on Linux, macOS and Windows (including WSL2).
+You need Python 3.11 or later on Linux, macOS or Windows (including WSL2).
 
-**Install** (pick one):
+The PyPI release is pending. Until it is live, install from GitHub:
 
 ```bash
-uvx agent-tap doctor                 # zero-install try-out
-pipx install agent-tap               # or: pip install agent-tap
-pipx install git+https://github.com/nareshh74/agent-tap   # straight from GitHub
+pipx install git+https://github.com/nareshh74/agent-tap
+uvx --from git+https://github.com/nareshh74/agent-tap agent-tap doctor
 ```
 
-> The PyPI release is still pending. Until it lands, use the `git+https://...` line (it works with `uvx --from git+https://github.com/nareshh74/agent-tap agent-tap doctor` as well).
+After the release, these commands work too:
 
-**Claude Code users** can also install the bundled skill with one line: `/plugin marketplace add nareshh74/agent-tap`.
+```bash
+pipx install agent-tap
+uvx agent-tap doctor
+```
 
-**Step 1: choose what to monitor.**
+If you use Claude Code, you can also install the bundled skill with `/plugin marketplace add nareshh74/agent-tap`.
+
+First, choose what to monitor:
 
 ```bash
 agent-tap init
 ```
 
-`init` (alias `setup`) auto-detects which harnesses have data on disk, then asks which ones to monitor, whether to override paths (custom OmniRoute directory, WSL2, adapter directory) and whether to store full prompt text (default: no). It also runs on the first `run`, `serve` or `service install` when no config exists. For scripts and CI use `--yes`, `--non-interactive` or `--harnesses claude-code,codex`; without a terminal it never prompts.
+`init` scans your machine for harnesses and known services, then asks which ones to enable. It pre-selects what it finds. It also asks whether to override any data path and whether to store prompt text (the default is no). The same questions appear on the first `run`, `serve` or `service install` when no config file exists and a terminal is attached. For scripts, pass `--yes`, `--non-interactive` or `--harnesses claude-code,codex`. Without a terminal, `init` never prompts.
 
-**Step 2: start the collector and the live dashboard.**
-
-```bash
-agent-tap run --watch                # collect continuously and serve the dashboard
-agent-tap serve                      # dashboard only, http://127.0.0.1:6007
-agent-tap service install            # background auto-start: Task Scheduler / launchd / systemd --user
-```
-
-**Step 3: look around from the terminal.**
+Now start the collector and the dashboard:
 
 ```bash
-agent-tap doctor                     # config, databases, which harnesses were found, source health
-agent-tap digest --hours 24          # sessions, tokens, tools, skills, error classes, schedules
-agent-tap query errors --json        # presets: harnesses, errors, tools, sessions; or any read-only SQL
+agent-tap run --watch       # collect continuously and serve the dashboard
+agent-tap serve             # dashboard only
+agent-tap service install   # start at login: Task Scheduler, launchd or systemd --user
 ```
+
+Open `http://127.0.0.1:6007`. Then check your setup from the terminal:
+
+```bash
+agent-tap doctor                 # config, databases, what was found, source health
+agent-tap digest --hours 24      # sessions, tokens, tools, skills, errors, schedules
+agent-tap query errors --json    # presets: harnesses, errors, tools, sessions, or any read-only SQL
+```
+
+## What agent-tap monitors
+
+Every monitored target is a service with one of three kinds. The kind decides which dashboard sections show it.
+
+| Kind | Examples | Where it appears |
+|---|---|---|
+| harness | `claude-code`, `codex`, `copilot-cli`, `hermes`, `raven`, `aider`, `cline` | Harness Activity (sessions, turns, tool calls, skill calls, parent-to-child correlation) and every shared section |
+| gateway | `omniroute`, `freellmapi` | Running Services & Gateways and every shared section |
+| service | `everos`, `searxng`, `firecrawl`, and any HTTP, Docker, process or log service you add | Running Services & Gateways and every shared section |
+
+The shared sections are Tool Usage & Latency, Skill Invocations, Crashes, Timeouts & Operational Errors, Scheduled Tasks & Crons, and source health.
+
+Running Services & Gateways lists each non-harness service with its status (healthy, degraded or down), endpoint or container, request and check counts, error count, p50 and p90 latency, and last seen time.
+
+The built-in services use these defaults. You can override any of them in `config.toml`.
+
+| Service | Health endpoint | Docker containers read for request logs |
+|---|---|---|
+| `everos` | `http://127.0.0.1:8000` | none |
+| `searxng` | `http://127.0.0.1:8888` | `searxng` |
+| `freellmapi` | `http://127.0.0.1:31415` | `freellmapi-freellmapi-1` |
+| `firecrawl` | `http://127.0.0.1:3003` | `firecrawl-api-1`, plus the companion containers for status |
+
+Each probe writes a span with `span_kind` `SERVICE` and the attributes `service.name`, `service.kind`, `service.status`, `service.endpoint`, `http.status_code`, `service.latency_ms` and `error.class` ([schema](docs/schema.md)).
+
+### Add your own service
+
+Run `agent-tap onboard` (alias `service-add`) with a name, a kind, and at least one source:
+
+```bash
+agent-tap onboard --name billing-api --kind service --health-url http://127.0.0.1:9000/health
+agent-tap onboard --name my-proxy --kind gateway --docker-container my-proxy-1
+agent-tap onboard --name worker --kind service --process-name worker.exe --log-path ~/logs/worker.log
+```
+
+The command appends a `[[services]]` entry to `config.toml`. For the full set of keys and for writing a Python adapter, see [docs/writing-a-service-adapter.md](docs/writing-a-service-adapter.md). To add a harness that writes JSONL or SQLite logs, see [docs/writing-an-adapter.md](docs/writing-an-adapter.md).
+
+## Dashboard sections
+
+- **Harness Activity** has one row per harness with sessions, traces, spans, turns, LLM calls, tool calls, skill calls, tokens, errors and latency.
+- **Running Services & Gateways** has one row per non-harness service.
+- **Scheduled Tasks & Crons** lists Windows Task Scheduler, macOS launchd and crontab, Linux systemd user timers and crontab, plus the native crons of Raven and Hermes.
+- **Recent Cron & Heartbeat Runs** shows the latest runs with status and duration.
+- **Tool Usage & Latency** and **Skill Invocations** rank tools and skills by use, with error rates.
+- **Crashes, Timeouts & Operational Errors** groups failures by normalized error class.
+- **Parent-to-Child Correlation Explorer** links a parent session to the child sessions it started.
+
+Every table sorts when you click a column header. Selecting a row opens the trace drawer with the spans of that trace. The **Report Issue** button in the header opens a pre-filled GitHub issue and copies a diagnostic bundle (see [Report a problem](#report-a-problem)).
 
 ## Operational debugging features
 
-Usage analytics tell you what your agents did; these tell you why something broke.
+Usage analytics tell you what your agents and services did. These features tell you why something broke.
 
-- **Normalized runtime error taxonomy (`error.class`)** across session logs *and* daemon/process logs, so identical failures group together instead of appearing as free text. Examples emitted today:
-  - Raven: `first_byte_timeout` (120 s LLM first-byte limit), `litellm_midstream_fallback_error`, `acp_prompt_timeout_600s`, `subagent_max_tool_rounds_15`, `scheduled_approval_timeout_10s`, `cron_nested_schedule_blocked`.
-  - Hermes: `mcp_oauth_400_refresh_loop` (a 5-minute MCP OAuth refresh failure loop is collapsed into hourly buckets instead of thousands of rows), `hermes_tool_error`.
-  - Copilot CLI: `acp_mcp_disposal_race`, `copilot_tool_error`.
-  - Claude Code: guardrail blocks such as `claude_sleep_guardrail_blocked`, plus tool errors.
-  - Codex: turn errors, `codex_responses_retry_warn`, upstream `401` classes.
-  - OmniRoute: `omniroute_http_<status>` (401, 499, 5xx), `omniroute_circuit_degraded`, app errors.
-- **Parent-to-child trace correlation across harnesses**: a Raven session links to its ACP child sessions and second-degree subagents (via ACP frame session ids, `parent_thread_id` on Codex, `fork-context-ref` on Claude Code). The dashboard's **Correlation explorer** shows the tree, and the in-page **trace drawer** opens any trace's spans with redacted tool inputs and outputs.
-- **Scheduled task and cron monitoring**: Windows Task Scheduler, macOS `launchd` plus `crontab`, Linux `systemd` user timers plus `crontab`, and the native cron/heartbeat histories of Raven and Hermes, with last run, next run, exit codes and failures.
-- **Per-source health**: every adapter stage keeps a watermark and a `source_health` row (last event, last error), surfaced in `agent-tap doctor` and the dashboard, so a silently broken collector is visible.
-- **SQL on everything**: the same data is a plain SQLite file you can query with `agent-tap query` or any SQLite tool ([docs/schema.md](docs/schema.md)).
+- **Normalized error classes.** Each failure gets an `error.class`, so identical failures group together instead of appearing as free text. The adapters emit classes such as these today.
+  - Raven: `first_byte_timeout` (the 120 second LLM first-byte limit), `litellm_midstream_fallback_error`, `acp_prompt_timeout_600s`, `subagent_max_tool_rounds_15`, `scheduled_approval_timeout_10s`, `cron_nested_schedule_blocked`.
+  - Hermes: `mcp_oauth_400_refresh_loop` and `hermes_tool_error`. A five-minute OAuth refresh loop collapses into hourly buckets instead of thousands of rows.
+  - Copilot CLI: `acp_mcp_disposal_race` and `copilot_tool_error`.
+  - Claude Code: guardrail blocks such as `claude_sleep_guardrail_blocked`, and tool errors.
+  - Codex: turn errors, `codex_responses_retry_warn` and upstream `401` classes.
+  - OmniRoute: `omniroute_http_<status>` (for example 401, 499 and 5xx) and `omniroute_circuit_degraded`.
+  - Services: each service adapter reports a down or degraded state with its own `error.class`, for example when a health endpoint times out.
+- **Parent-to-child traces across harnesses.** A Raven session links to its ACP child sessions and to second-degree subagents through ACP frame session ids, Codex `parent_thread_id` and Claude Code `fork-context-ref`. The correlation explorer shows the tree, and the trace drawer shows each span with secrets redacted.
+- **Scheduled task monitoring.** Each schedule shows its last run, next run, exit code and failures.
+- **Source health.** Every adapter stage keeps a watermark and a `source_health` row with the last event and the last error. `agent-tap doctor` and the dashboard show them, so a collector that stopped working is visible.
+- **SQL on everything.** The data is a plain SQLite file. Query it with `agent-tap query` or any SQLite tool.
 
-## Dashboard
+## How agent-tap compares to other tools
 
-- **1. Per-harness summary**: sessions, spans, tokens, errors per harness.
-- **1B. Hermes profile breakdown**: per-profile activity (profiles are discovered, not hardcoded).
-- **1C / 1D. Scheduled tasks and crons** and their recent runs.
-- **2. Tools leaderboard** and **3. Skills leaderboard**.
-- **4. Errors**: crashes, timeouts and normalized error classes.
-- **5. Correlation explorer**: parent session to child session across harnesses.
-- Every table is sortable; clicking a row opens the trace/spans drawer.
+| | Usage, tokens, cost | Error classes from process logs | Cross-harness parent-to-child traces | Schedule monitoring | Running services and gateways | Local SQLite, no Docker or SDK | New agent or service without code |
+|---|---|---|---|---|---|---|---|
+| agent-tap | Sessions, tokens, tools and skills. No dollar pricing | Yes | Yes | Yes | Yes | Yes | Yes (TOML and entry points) |
+| CodeBurn | Cost estimates, models and optimization advice | No | No | No | No | Yes | No |
+| ccusage | Token and cost reports from local logs | No | No | No | No | Yes | No |
+| agentsview | Session browsing and search with analytics | Not its focus | Not its focus | No | No | Yes | Not its focus |
+| Phoenix, Langfuse, OpenLIT | Strong for apps you instrument | Through your own instrumentation | Through trace context you propagate | No | Through your own instrumentation | Usually a server or Docker plus an SDK or OTLP exporter | Instrumentation, not log adapters |
 
-## How agent-tap differs from other tools (and how to use it with them)
+The table summarizes what each project usually focuses on and may be out of date. Check each project's documentation, and open an issue if a row is wrong.
 
-| | Usage, tokens, cost | Runtime error taxonomy from process logs | Cross-harness parent-to-child correlation | Cron / scheduled-task monitoring | Local SQLite, no Docker or SDK | Add new agents without code |
-|---|---|---|---|---|---|---|
-| **agent-tap** | Sessions, tokens, tools, skills (no dollar pricing) | Yes | Yes | Yes | Yes | Yes (TOML + entry points) |
-| CodeBurn | Strong: cost estimates, models, optimization advice | No | No | No | Yes | No |
-| ccusage | Strong: token and cost reports from local logs | No | No | No | Yes | No |
-| agentsview | Session browsing and search with analytics | Not its focus | Not its focus | No | Yes | Not its focus |
-| Arize Phoenix / Langfuse / OpenLIT | Strong for apps you instrument | Via your own instrumentation | Via trace context you propagate | No | Typically a server or Docker plus an SDK or OTLP exporter | Instrumentation, not log adapters |
+agent-tap reads what your agents and services already write, so you get one analytics and debugging view across many different programs without instrumenting them or sending data off the machine.
 
-This comparison is a summary of each project's usual focus and may be out of date; check their docs. Corrections are welcome as issues.
+You can run it next to the other tools:
 
-**The USP:** agent-tap reads what your agents *already write to disk*, so you get correlated analytics and debugging across many different agent harnesses without instrumenting anything, running a server, or sending data off the machine.
+- Keep CodeBurn or ccusage for dollar estimates and savings advice. Use agent-tap to find which sessions failed, timed out or looped.
+- Keep agentsview to read and search transcripts. Use agent-tap for error classes, trace trees and schedules.
+- Use Phoenix, Langfuse or OpenLIT for the LLM applications you build and deploy. Use agent-tap for the agents and services on your own machine. The span tables have the same shape as Phoenix, so exporting is a SQL query.
 
-**Use it together:**
+## Report a problem
 
-- Keep **CodeBurn** or **ccusage** for dollar-cost estimates and savings advice; use agent-tap to find out *which* sessions failed, timed out or looped, and what they were doing.
-- Keep **agentsview** for reading and searching transcripts; use agent-tap for fleet-level error classes, trace trees and schedules.
-- Use **Phoenix / Langfuse / OpenLIT** for the LLM apps you build and deploy; use agent-tap for the coding agents you run on your own machine. The span table is Phoenix-compatible in shape, so exporting to those tools is straightforward SQL.
+Open an issue with one of the forms in [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE): a bug report, or a request to support a new service or harness.
+
+Before you file a bug, generate the diagnostics:
+
+```bash
+agent-tap bug-report --service firecrawl --error-text "paste the error or traceback here"
+agent-tap bug-report --error-file error.txt --output report.md
+agent-tap bug-report --open     # opens a pre-filled GitHub issue
+```
+
+The report lists your operating system, Python version, agent-tap version, enabled services and harnesses, source health, and recent errors from the agent-tap log. Before it writes anything, it masks secrets with the same rules as span redaction and replaces your home directory with `~`. Read the report before you post it. The dashboard's Report Issue button produces the same bundle.
 
 ## FAQ
 
 **How do I monitor and debug Claude Code, Codex and GitHub Copilot CLI locally?**
-Install agent-tap, run `agent-tap init` to pick the harnesses, then `agent-tap run --watch`. Open `http://127.0.0.1:6007` for usage analytics and errors, or run `agent-tap digest --hours 24` in the terminal. Everything stays in a local SQLite file.
+Install agent-tap, run `agent-tap init` to pick the harnesses, then run `agent-tap run --watch`. Open `http://127.0.0.1:6007` for usage and errors, or run `agent-tap digest --hours 24`. Everything stays in a local SQLite file.
 
 **How do I trace parent-to-child subagents across coding agents?**
-agent-tap links a parent session to the child sessions it spawned (Raven to ACP children and nested subagents, Codex `parent_thread_id`, Claude Code `fork-context-ref`). Use the dashboard's Correlation explorer and trace drawer, or query the `spans` table by `child.session_id`.
+agent-tap links a parent session to the child sessions it started. Use the Parent-to-Child Correlation Explorer and the trace drawer, or query the `spans` table by `child.session_id`.
+
+**How do I monitor local services such as SearXNG, Firecrawl, EverOS or FreeLLMAPI?**
+Select them in `agent-tap init`. agent-tap probes each health endpoint and reads the Docker container logs. For any other service, run `agent-tap onboard`.
 
 **Is there an open-source complement to CodeBurn and ccusage that also helps with debugging?**
-Yes: agent-tap. It does not price tokens in dollars; it adds a normalized error taxonomy, trace correlation across harnesses and cron monitoring. Run it alongside CodeBurn or ccusage.
+Yes. agent-tap does not price tokens in dollars. It adds error classes, trace correlation across harnesses, service monitoring and schedule monitoring. Run it next to CodeBurn or ccusage.
 
 **Does agent-tap send my prompts anywhere?**
-No. It makes no network calls, and prompt/tool text is dropped by default. Opt in with `store_prompt_text = true` or `AGENT_TAP_STORE_PROMPTS=1`. Secrets are redacted on a best-effort basis ([docs/privacy.md](docs/privacy.md)).
-
-**Which agents does agent-tap support, and can I add my own?**
-Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven and OmniRoute are built in; Aider and Cline ship as declarative TOML examples. Add another agent with a TOML file or a Python adapter ([docs/writing-an-adapter.md](docs/writing-an-adapter.md)).
+No. It makes no network calls except the health probes you configure against your own services. Prompt and tool text is dropped by default. To store it, set `store_prompt_text = true` or `AGENT_TAP_STORE_PROMPTS=1`. Secret redaction is pattern based, so treat it as best effort ([docs/privacy.md](docs/privacy.md)).
 
 **What does it need to run?**
-Python 3.11+ and three small dependencies. No Docker, database server, API key or account.
+Python 3.11 or later and three small dependencies. It needs no Docker, database server, API key or account. Docker is only needed to read the logs of services that run in Docker.
 
 ## CLI reference
 
 | Command | Purpose |
 |---|---|
-| `agent-tap init [--yes\|--non-interactive] [--harnesses h1,h2] [--store-prompts]` | Interactive setup (alias `setup`); also offered on first `run`/`serve`/`service install` |
-| `agent-tap doctor` | Show config, paths, discovered adapters, source health |
-| `agent-tap run [--once\|--watch]` | Collect spans once, or continuously with the dashboard (`daemon` is an alias for `run --watch`) |
-| `agent-tap serve [--port 6007]` | Dashboard only |
-| `agent-tap query <sql\|preset> [--json]` | Run read-only SQL or a named preset against the spans DB |
-| `agent-tap digest [--hours 24] [--json]` | Correlated session and error digest |
+| `agent-tap init [--yes\|--non-interactive] [--harnesses h1,h2] [--store-prompts]` | Choose harnesses and services. Alias `setup` |
+| `agent-tap onboard --name NAME --kind service\|gateway\|harness [--health-url URL] [--docker-container NAME] [--log-path FILE] [--process-name NAME]` | Add a service to `config.toml`. Alias `service-add` |
+| `agent-tap doctor [--json]` | Show config, paths, what was found and source health |
+| `agent-tap run [--once\|--watch]` | Collect once, or continuously with the dashboard. `daemon` is an alias for `run --watch` |
+| `agent-tap serve [--port 6007]` | Run the dashboard only |
+| `agent-tap query <sql or preset> [--json]` | Run read-only SQL or a preset against the spans database |
+| `agent-tap digest [--hours 24] [--json]` | Print a session and error digest |
 | `agent-tap prune [--days 90]` | Delete traces older than the window |
-| `agent-tap service install\|status\|uninstall\|render [--os windows\|macos\|linux]` | Manage the background service; `render` prints the unit without installing |
-| `agent-tap adapters list\|validate <file.toml>` | List adapters / validate a declarative adapter |
+| `agent-tap bug-report [--error-text TEXT] [--error-file FILE] [--service NAME] [--open] [--json] [--output FILE]` | Build a diagnostic bundle for a GitHub issue |
+| `agent-tap service install\|status\|uninstall\|render [--os windows\|macos\|linux]` | Manage the background service. `render` prints the unit without installing it |
+| `agent-tap adapters list\|validate <file.toml>` | List adapters or validate a declarative adapter |
 | `agent-tap config show` | Print the effective configuration |
 
-Global flags: `--config <file>`; per-command flags override everything below.
+The global flag `--config <file>` selects a config file.
 
 ## Configuration
 
-Precedence: **CLI flags > `AGENT_TAP_*` env vars > `config.toml` > OS defaults**.
+Settings come from four places. Each one overrides the ones after it: command-line flags, `AGENT_TAP_*` environment variables, `config.toml`, and operating system defaults.
 
-`config.toml` lives in the user config dir (`~/.config/agent-tap/` on Linux, `~/Library/Application Support/agent-tap/` on macOS, `%LOCALAPPDATA%\agent-tap\` on Windows) or at `AGENT_TAP_CONFIG`.
+`config.toml` lives in the user config directory (`~/.config/agent-tap/` on Linux, `~/Library/Application Support/agent-tap/` on macOS, `%LOCALAPPDATA%\agent-tap\` on Windows). Set `AGENT_TAP_CONFIG` to use another path.
 
 ```toml
 spans_db = "/path/to/spans.db"
 state_db = "/path/to/state.sqlite"
-store_prompt_text = false     # AGENT_TAP_STORE_PROMPTS=1 to enable
-host = "127.0.0.1"            # AGENT_TAP_HOST
-port = 6007                   # AGENT_TAP_PORT
-interval = 5.0                # poll seconds
+store_prompt_text = false        # AGENT_TAP_STORE_PROMPTS=1 to enable
+host = "127.0.0.1"               # AGENT_TAP_HOST
+port = 6007                      # AGENT_TAP_PORT
+interval = 5.0                   # poll interval in seconds
 lookback_hours = 48.0
 retention_days = 90
 project_name = "agent-analytics"
-enabled_harnesses = ["claude-code", "codex"]   # omit to use all discovered (legacy key: adapters)
-adapters_dir = "~/.config/agent-tap/adapters"  # declarative *.toml adapters
-wsl_discovery = false         # AGENT_TAP_WSL=1: look for OmniRoute in WSL2 (Windows)
+enabled_services = ["claude-code", "codex", "searxng"]   # omit to use everything found
+adapters_dir = "~/.config/agent-tap/adapters"            # declarative harness adapters
+wsl_discovery = false            # AGENT_TAP_WSL=1 looks for OmniRoute in WSL2 on Windows
 
-[paths]                        # per-adapter data-dir overrides (or AGENT_TAP_<NAME>_DIR)
+[paths]                          # data directory overrides, or AGENT_TAP_<NAME>_DIR
 codex = "/custom/.codex"
+
+[[services]]                     # one entry per onboarded service
+name = "billing-api"
+kind = "service"                 # harness, gateway or service
+health_url = "http://127.0.0.1:9000/health"
+docker_container = "billing-api-1"
+log_path = "~/logs/billing.log"
+process_name = "billing"
 ```
 
-Env vars: `AGENT_TAP_CONFIG`, `AGENT_TAP_SPANS_DB`, `AGENT_TAP_STATE_DB`, `AGENT_TAP_STORE_PROMPTS`, `AGENT_TAP_HOST`, `AGENT_TAP_PORT`, `AGENT_TAP_WSL`, `AGENT_TAP_OMNIROUTE_DIR`.
+The older key names `enabled_harnesses` and `adapters` still work as aliases for `enabled_services`.
 
-### Auto-discovered locations
+Environment variables: `AGENT_TAP_CONFIG`, `AGENT_TAP_SPANS_DB`, `AGENT_TAP_STATE_DB`, `AGENT_TAP_STORE_PROMPTS`, `AGENT_TAP_HOST`, `AGENT_TAP_PORT`, `AGENT_TAP_WSL` and `AGENT_TAP_OMNIROUTE_DIR`.
+
+### Where agent-tap looks for harness data
 
 | Harness | Locations checked |
 |---|---|
 | Claude Code | `~/.claude/projects`, `$XDG_CONFIG_HOME/claude/projects` |
 | Codex | `$CODEX_HOME` or `~/.codex` |
 | Copilot CLI | `~/.copilot` |
-| Hermes | `$HERMES_HOME`, `~/.hermes`, `%LOCALAPPDATA%\hermes`, `$XDG_DATA_HOME/hermes`; `state.db` and every `profiles/*` |
+| Hermes | `$HERMES_HOME`, `~/.hermes`, `%LOCALAPPDATA%\hermes`, `$XDG_DATA_HOME/hermes`. It reads `state.db` and every `profiles` subdirectory |
 | Raven | `~/.raven` |
-| OmniRoute | `AGENT_TAP_OMNIROUTE_DIR`, `~/.omniroute`; WSL2 volumes when `wsl_discovery` is on |
+| OmniRoute | `AGENT_TAP_OMNIROUTE_DIR`, `~/.omniroute`, and WSL2 volumes when `wsl_discovery` is on |
 
-## Adapters
+## More documentation
 
-Six built-in Python adapters ship via the `agent_tap.harnesses` entry-point group; declarative TOML adapters (examples for Aider and Cline/Roo Code in `examples/adapters/`) cover simple JSONL/SQLite logs without code. See [docs/writing-an-adapter.md](docs/writing-an-adapter.md). Storage layout: [docs/schema.md](docs/schema.md).
+- [Storage schema](docs/schema.md)
+- [Privacy](docs/privacy.md)
+- [Write a harness adapter](docs/writing-an-adapter.md)
+- [Write a service adapter](docs/writing-a-service-adapter.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## License
 

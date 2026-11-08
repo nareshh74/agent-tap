@@ -31,6 +31,7 @@ class Context:
 @runtime_checkable
 class HarnessAdapter(Protocol):
     name: str
+    kind: str  # "harness" (default when missing), "gateway" or "service"
 
     def discover(self, ctx: Context) -> bool:
         """True when this harness has data on this machine."""
@@ -48,10 +49,26 @@ def builtin_adapters() -> dict[str, Callable[[], HarnessAdapter]]:
     from .omniroute import OmniRouteAdapter
     from .raven import RavenAdapter
 
+    from .service import BUILTIN_SERVICE_ADAPTERS
+
     return {
+        **BUILTIN_SERVICE_ADAPTERS,
         "raven": RavenAdapter, "hermes": HermesAdapter, "claude-code": ClaudeCodeAdapter,
         "codex": CodexAdapter, "copilot-cli": CopilotCliAdapter, "omniroute": OmniRouteAdapter,
     }
+
+
+def adapter_kind(adapter: Any) -> str:
+    from ..core.schema import SERVICE_KINDS, service_kind_for
+
+    kind = getattr(adapter, "kind", None)
+    return kind if kind in SERVICE_KINDS else service_kind_for(adapter.name)
+
+
+def merge_service_adapters(adapters: list, extra: list) -> list:
+    """Add service adapters; a configured service replaces an adapter with the same name."""
+    names = {a.name for a in extra}
+    return [a for a in adapters if a.name not in names] + list(extra)
 
 
 def load_adapters(config: Config) -> list[HarnessAdapter]:
@@ -64,10 +81,12 @@ def load_adapters(config: Config) -> list[HarnessAdapter]:
             continue
     adapters = [f() for f in factories.values()]
     from .declarative import load_declarative_adapters
+    from .service import load_service_adapters
 
     adapters += load_declarative_adapters(config.adapters_dir)
-    if config.enabled_harnesses is not None:
-        adapters = [a for a in adapters if a.name in config.enabled_harnesses]
+    adapters = merge_service_adapters(adapters, load_service_adapters(config))
+    if config.enabled_services is not None:
+        adapters = [a for a in adapters if a.name in config.enabled_services]
     return adapters
 
 

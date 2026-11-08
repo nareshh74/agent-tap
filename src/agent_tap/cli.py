@@ -196,9 +196,16 @@ def cmd_adapters(cfg: Config, args: argparse.Namespace) -> int:
     from .adapters.base import Context, load_adapters
 
     if args.action == "validate":
-        from .adapters.declarative import validate_file
+        import tomllib
 
-        errors = validate_file(Path(args.file))
+        from .adapters.declarative import validate_file
+        from .adapters.service import validate_services_file
+
+        try:
+            has_services = "services" in tomllib.loads(Path(args.file).read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError):
+            has_services = False
+        errors = validate_services_file(Path(args.file)) if has_services else validate_file(Path(args.file))
         if errors:
             print("\n".join(f"error: {e}" for e in errors), file=sys.stderr)
             return 1
@@ -279,6 +286,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("action", choices=["list", "validate"])
     p.add_argument("file", nargs="?")
 
+    from . import bugreport
+    from .onboard import add_parser as add_onboard_parser
+
+    add_onboard_parser(sub)
+    bugreport.add_parser(sub)
+
     p = sub.add_parser("config", help="Show effective configuration")
     p.add_argument("action", choices=["show"])
 
@@ -311,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "digest":
         from .digest import generate_digest
 
-        print(generate_digest(hours=args.hours, phoenix_db=cfg.spans_db, state_db=cfg.state_db, as_json=args.json))
+        print(generate_digest(hours=args.hours, phoenix_db=cfg.spans_db, state_db=cfg.state_db, as_json=args.json, service_kinds=cfg.service_kinds()))
         return 0
     if args.cmd == "prune":
         from .digest import prune_spans
@@ -322,6 +335,14 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_service(cfg, args)
     if args.cmd == "adapters":
         return cmd_adapters(cfg, args)
+    if args.cmd in ("onboard", "service-add"):
+        from .onboard import cmd_onboard
+
+        return cmd_onboard(cfg, args)
+    if args.cmd == "bug-report":
+        from . import bugreport
+
+        return bugreport.cmd_bug_report(cfg, args)
     if args.cmd == "config":
         print(json.dumps(cfg.as_dict(), indent=2, default=str))
         return 0

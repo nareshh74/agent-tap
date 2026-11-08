@@ -22,8 +22,10 @@ def _claude_prompt(home, text):
     ])
 
 
-def test_all_six_builtins_registered():
-    assert sorted(builtin_adapters()) == ["claude-code", "codex", "copilot-cli", "hermes", "omniroute", "raven"]
+def test_builtins_registered():
+    names = set(builtin_adapters())
+    assert {"claude-code", "codex", "copilot-cli", "hermes", "omniroute", "raven"} <= names
+    assert {"everos", "searxng", "freellmapi", "firecrawl"} <= names
     for name, factory in builtin_adapters().items():
         assert factory().name == name
 
@@ -121,10 +123,13 @@ def test_omniroute(home, run, monkeypatch, tmp_path):
     con.commit()
     con.close()
     monkeypatch.setenv("AGENT_TAP_OMNIROUTE_DIR", str(d))
+    monkeypatch.setenv("AGENT_TAP_OMNIROUTE_URL", "http://127.0.0.1:9/health")  # nothing listens: probe reports down
     res, sp = run(OmniRouteAdapter(), 0)
-    assert res["omniroute"][0] >= 1
-    err = [s for s in sp if s["attrs"].get("harness") == "omniroute"][0]
-    assert err["status"] == "ERROR" and err["attrs"]["http"]["status_code"] == 500
+    assert res["omniroute"][0] >= 1 and res["omniroute_probe"][0] == 1
+    err = [s for s in sp if (s["attrs"].get("http") or {}).get("status_code") == 500][0]
+    assert err["status"] == "ERROR" and err["attrs"]["harness"] == "omniroute"
+    probe = [s for s in sp if (s["attrs"].get("service") or {}).get("status")][0]
+    assert probe["attrs"]["service"]["status"] == "down" and probe["attrs"]["service"]["kind"] == "gateway"
 
 
 def test_store_prompt_text_off(home, run):

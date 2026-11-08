@@ -1,0 +1,7 @@
+# A Docker container with request logs. log_format is optional. Named groups: ts, method, path, status, duration_ms.
+# Without log_format, lines that contain ERROR, CRITICAL, FATAL, Traceback or Exception become error spans.
+[[services]]
+name = "myworker"
+kind = "service"
+docker_container = "myworker-1"
+log_format = '"(?P<method>GET|POST) (?P<path>\S+) HTTP/1\.1" (?P<status>\d{3}) (?P<duration_ms>\d+)ms'

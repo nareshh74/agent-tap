@@ -24,11 +24,24 @@ class Config:
     lookback_hours: float = 48.0
     retention_days: int = 90
     project_name: str = "agent-analytics"
-    enabled_harnesses: list[str] | None = None  # None = all discovered adapters
+    enabled_services: list[str] | None = None  # harnesses and services to poll; None = all discovered
+    services: list[dict[str, Any]] = field(default_factory=list)  # [[services]] entries from config.toml
     adapters_dir: Path = field(default_factory=paths.adapters_dir)
     wsl_discovery: bool = False
     harness_dirs: dict[str, Path] = field(default_factory=dict)
     source: Path | None = None
+
+    @property
+    def enabled_harnesses(self) -> list[str] | None:
+        """Legacy name for enabled_services."""
+        return self.enabled_services
+
+    @enabled_harnesses.setter
+    def enabled_harnesses(self, value: list[str] | None) -> None:
+        self.enabled_services = value
+
+    def service_kinds(self) -> dict[str, str]:
+        return {str(s["name"]): str(s.get("kind", "service")) for s in self.services if s.get("name")}
 
     def harness_dir(self, name: str) -> Path | None:
         """Explicit data-dir override: AGENT_TAP_<NAME>_DIR env, then config.toml [paths]."""
@@ -39,6 +52,7 @@ class Config:
 
     def as_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {k: (str(v) if isinstance(v, Path) else v) for k, v in self.__dict__.items()}
+        d["services"] = [dict(x) for x in self.services]
         d["harness_dirs"] = {k: str(v) for k, v in self.harness_dirs.items()}
         return d
 
@@ -53,11 +67,15 @@ def load_config(path: str | Path | None = None, overrides: dict[str, Any] | None
             if k in data:
                 setattr(cfg, k, Path(data[k]).expanduser())
         for k in ("store_prompt_text", "host", "port", "interval", "lookback_hours", "retention_days",
-                  "project_name", "enabled_harnesses", "wsl_discovery"):
+                  "project_name", "enabled_services", "wsl_discovery"):
             if k in data:
                 setattr(cfg, k, data[k])
-        if "enabled_harnesses" not in data and "adapters" in data:  # legacy key
-            cfg.enabled_harnesses = data["adapters"]
+        if "enabled_services" not in data:
+            for legacy in ("enabled_harnesses", "adapters"):
+                if legacy in data:
+                    cfg.enabled_services = data[legacy]
+                    break
+        cfg.services = [dict(x) for x in data.get("services") or [] if isinstance(x, dict)]
         cfg.harness_dirs = {k: Path(v).expanduser() for k, v in (data.get("paths") or {}).items()}
     env = os.environ.get
     if env("AGENT_TAP_SPANS_DB"):

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question or share an idea
+    url: https://github.com/nareshh74/agent-tap/discussions
+    about: Use Discussions for questions, setup help, and feature ideas.
+  - name: Read the documentation
+    url: https://github.com/nareshh74/agent-tap#readme
+    about: The README covers installation, configuration, adapters, and troubleshooting.

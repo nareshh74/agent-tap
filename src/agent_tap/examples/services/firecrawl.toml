@@ -1,0 +1,13 @@
+# firecrawl: scrape and search API in Docker. The api container's logs are parsed.
+# Each companion container is inspected and shows up as a firecrawl.<component> probe.
+[[services]]
+name = "firecrawl"
+kind = "service"
+health_url = "http://127.0.0.1:3003/"
+docker_container = "firecrawl-api-1"
+
+[services.components]
+playwright = "firecrawl-playwright-service-1"
+postgres = "firecrawl-nuq-postgres-1"
+redis = "firecrawl-redis-1"
+rabbitmq = "firecrawl-rabbitmq-1"

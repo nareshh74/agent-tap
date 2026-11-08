@@ -1,0 +1,6 @@
+# freellmapi: LLM proxy in Docker. Completions become LLM spans with token counts.
+[[services]]
+name = "freellmapi"
+kind = "gateway"
+health_url = "http://127.0.0.1:31415/health"
+docker_container = "freellmapi-freellmapi-1"

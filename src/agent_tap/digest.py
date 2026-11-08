@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .core.paths import default_spans_db, default_state_db
+from .core.schema import service_kind_for
 from .platform.scheduler import collect_scheduled_tasks_and_crons
 
 
@@ -33,6 +34,7 @@ def generate_digest(
     phoenix_db: Path | None = None,
     state_db: Path | None = None,
     as_json: bool = False,
+    service_kinds: dict[str, str] | None = None,
 ) -> str:
     phoenix_db = Path(phoenix_db) if phoenix_db else default_spans_db()
     state_db = Path(state_db) if state_db else default_state_db()
@@ -54,6 +56,10 @@ def generate_digest(
             s.span_kind,
             s.status_code,
             s.name,
+            s.start_time,
+            JSON_EXTRACT(s.attributes, '$.service.kind') AS svc_kind,
+            JSON_EXTRACT(s.attributes, '$.service.status') AS svc_status,
+            JSON_EXTRACT(s.attributes, '$.service.endpoint') AS svc_endpoint,
             s.trace_rowid,
             s.parent_id,
             COALESCE(s.llm_token_count_prompt, JSON_EXTRACT(s.attributes, '$.llm.token_count.prompt'), 0) AS prompt_tok,
@@ -92,6 +98,10 @@ def generate_digest(
             "latencies_ms": [],
         }
     )
+    kinds: dict[str, str] = {}
+    service_stats: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"checks": 0, "requests": 0, "errors": 0, "status": "unknown", "status_at": "", "endpoint": "", "last_seen": ""}
+    )
     error_classes: dict[tuple[str, str], int] = defaultdict(int)
     tool_counts: dict[tuple[str, str], int] = defaultdict(int)
     tool_errors: dict[tuple[str, str], int] = defaultdict(int)
@@ -100,6 +110,20 @@ def generate_digest(
 
     for r in rows:
         h = str(r["harness"] or "unknown")
+        kinds[h] = str(r["svc_kind"] or kinds.get(h) or service_kind_for(h, service_kinds))
+        if kinds[h] != "harness":
+            sv = service_stats[h]
+            started = str(r["start_time"] or "")
+            if r["span_kind"] == "SERVICE" and r["svc_status"]:
+                sv["checks"] += 1
+                if started >= sv["status_at"]:
+                    sv["status_at"], sv["status"] = started, str(r["svc_status"])
+                    sv["endpoint"] = str(r["svc_endpoint"] or sv["endpoint"])
+            else:
+                sv["requests"] += 1
+            if r["status_code"] == "ERROR" or r["err_class"]:
+                sv["errors"] += 1
+            sv["last_seen"] = max(sv["last_seen"], started)
         st = stats[h]
         st["spans"] += 1
         st["traces"].add(r["trace_rowid"])
@@ -191,7 +215,7 @@ def generate_digest(
 
     if as_json:
         serializable_stats = {}
-        for h, d in stats.items():
+        for h, d in ((k, v) for k, v in stats.items() if kinds.get(k) == "harness"):
             lats = sorted(d["latencies_ms"])
             p50 = round(lats[len(lats) // 2], 1) if lats else 0.0
             p90 = round(lats[int(len(lats) * 0.9)], 1) if lats else 0.0
@@ -215,6 +239,7 @@ def generate_digest(
             {
                 "window_hours": hours,
                 "harnesses": serializable_stats,
+                "services": [{"service": n, "kind": kinds[n], **service_stats[n]} for n in sorted(service_stats)],
                 "error_classes": [
                     {"harness": h, "error_class": ec, "count": cnt}
                     for (h, ec), cnt in sorted(error_classes.items(), key=lambda x: x[1], reverse=True)
@@ -229,11 +254,11 @@ def generate_digest(
     lines = [
         f"# agent-tap Digest (Last {hours:g} Hours - Since {cutoff_iso} UTC)",
         "",
-        "## 1. Per-Harness Activity & Telemetry Summary (Local SQLite)",
+        "## Harness Activity",
         "| Harness | Sessions | Traces | Total Spans | Turns | Tool Calls | Skill Spans | Total Tokens (In + Out) | Error Spans (Events) | Latency p50 / p90 (ms) |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
-    for h in sorted(stats.keys()):
+    for h in sorted(k for k in stats if kinds.get(k) == "harness"):
         d = stats[h]
         lats = sorted(d["latencies_ms"])
         p50 = f"{lats[len(lats) // 2]:.0f}" if lats else "-"
@@ -248,7 +273,22 @@ def generate_digest(
     lines.extend(
         [
             "",
-            "## 2. Top 20 Most Used Tools (Across All Harnesses)",
+            "## Running Services & Gateways",
+            "| Service | Kind | Status | Endpoint / Container | Checks | Requests | Errors | Last Seen (UTC) |",
+            "| :--- | :--- | :---: | :--- | :---: | :---: | :---: | :---: |",
+        ]
+    )
+    for n in sorted(service_stats):
+        sv = service_stats[n]
+        lines.append(
+            f"| **{n}** | {kinds[n]} | {sv['status']} | `{sv['endpoint'] or '-'}` | {sv['checks']:,} | "
+            f"{sv['requests']:,} | {sv['errors']:,} | {sv['last_seen'][:19] or '-'} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Tool Usage",
             "| Rank | Harness | Tool Name | Calls | Errors |",
             "| :---: | :--- | :--- | :---: | :---: |",
         ]
@@ -260,7 +300,7 @@ def generate_digest(
     lines.extend(
         [
             "",
-            "## 3. Most Used / Loaded Skills (Explicit Tool Invocations + Preloaded Startup Injections)",
+            "## Skill Invocations",
             "| Category | Harness | Skill / Operation | Count |",
             "| :--- | :--- | :--- | :---: |",
         ]
@@ -273,7 +313,7 @@ def generate_digest(
     lines.extend(
         [
             "",
-            "## 4. Normalized Runtime & Session Error Classes",
+            "## Crashes, Timeouts & Operational Errors",
             "| Harness | Error Class | Event Count |",
             "| :--- | :--- | :---: |",
         ]
@@ -284,7 +324,7 @@ def generate_digest(
     lines.extend(
         [
             "",
-            "## 5. Parent-to-Child Correlation Links (`Raven -> ACP -> Child`)",
+            "## Parent-to-Child Correlation",
             "| Child Harness | Confidence | Linked Node Runs | Distinct Child Sessions |",
             "| :--- | :---: | :---: | :---: |",
         ]
@@ -297,7 +337,7 @@ def generate_digest(
     lines.extend(
         [
             "",
-            "## 6. Scheduled Tasks & Crons (OS scheduler + Raven + Hermes crons)",
+            "## Scheduled Tasks & Crons",
             "| Source | Name | Profile | Schedule | State | Last Run (UTC) | Next Run (UTC) | Last Status | Exit Code |",
             "| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |",
         ]

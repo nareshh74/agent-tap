@@ -1,0 +1,8 @@
+# Any HTTP service with a health endpoint. Replace the name and URL.
+# kind is "service" for a plain service, "gateway" for an AI gateway, or "harness" for an agent harness.
+[[services]]
+name = "myapi"
+kind = "service"
+health_url = "http://127.0.0.1:9000/health"
+probe_interval = 30      # seconds between probes (default 30)
+timeout = 3              # seconds before a probe counts as down

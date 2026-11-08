@@ -1,0 +1,6 @@
+# everos: local memory service. The built-in adapter already probes these defaults.
+# Add this entry only to change the URL. The name matches the built-in, so it overrides the defaults.
+[[services]]
+name = "everos"
+kind = "service"
+health_url = "http://127.0.0.1:8000/health"

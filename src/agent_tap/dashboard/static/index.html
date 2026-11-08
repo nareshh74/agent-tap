@@ -287,28 +287,22 @@
         <button data-hours="720">30d</button>
         <button data-hours="2160">90d</button>
       </div>
-      <select id="harnessSelect" title="Filter by Harness">
-        <option value="all">All Harnesses</option>
-        <option value="raven">raven (Main + Nodes)</option>
-        <option value="raven-acp">raven-acp (Subagents)</option>
-        <option value="hermes">hermes (all profiles)</option>
-        <option value="claude">claude (Claude Code)</option>
-        <option value="codex">codex (Codex CLI)</option>
-        <option value="copilot">copilot (GitHub Copilot)</option>
-        <option value="omniroute">omniroute (LLM Router)</option>
+      <select id="harnessSelect" title="Filter by harness or service">
+        <option value="all">All harnesses and services</option>
       </select>
       <input type="search" id="globalSearch" placeholder="Filter tools, skills, errors, sessions..." />
       <button class="btn" id="refreshBtn">Refresh Now</button>
+      <button class="btn" id="reportBtn" title="Open a pre-filled GitHub issue with a diagnostic bundle">Report Issue</button>
     </div>
   </header>
 
   <main>
     <div class="kpi-grid" id="kpiGrid"></div>
 
-    <!-- Section 1: Per-Harness Summary + Hermes Profile Drilldown -->
+    <!-- Harness activity -->
     <div class="section">
       <div class="section-header">
-        <h2>1. Per-Harness Activity & Telemetry Summary</h2>
+        <h2>Harness Activity</h2>
         <span class="kpi-sub">Click any filter chip to copy the exact span filter expression</span>
       </div>
       <div class="table-wrap">
@@ -336,26 +330,26 @@
       </div>
     </div>
 
-    <!-- Section 1B: Hermes Profile Breakdown -->
+    <!-- Running services and gateways -->
     <div class="section">
       <div class="section-header">
-        <h2>1B. Hermes Profile Breakdown (state.db + errors.log)</h2>
-        <span class="kpi-sub">All active Hermes profiles polled read-only</span>
+        <h2>Running Services &amp; Gateways</h2>
+        <span class="kpi-sub">Health probes and request logs for every onboarded service (healthy, degraded or down)</span>
       </div>
       <div class="table-wrap">
-        <table id="hermesProfileTable">
+        <table id="servicesTable">
           <thead>
             <tr>
-              <th>Hermes Profile</th>
-              <th class="num">Sessions</th>
-              <th class="num">Spans</th>
-              <th class="num">Turns</th>
-              <th class="num">Tool Calls</th>
-              <th class="num">Skill Spans</th>
-              <th class="num">Total Tokens</th>
-              <th class="num">Est. Cost (USD)</th>
-              <th class="num">Error Spans (Events)</th>
-              <th>Filter</th>
+              <th>Service</th>
+              <th>Kind</th>
+              <th>Status</th>
+              <th>Endpoint / Container</th>
+              <th class="num">Checks</th>
+              <th class="num">Requests</th>
+              <th class="num">Errors</th>
+              <th class="num">Latency p50 / p90 (ms)</th>
+              <th>Last Seen (UTC)</th>
+              <th>Inspect</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -363,10 +357,10 @@
       </div>
     </div>
 
-    <!-- Section 1C: Configured Scheduled Tasks & Crons -->
+    <!-- Scheduled tasks and crons -->
     <div class="section">
       <div class="section-header">
-        <h2>1C. Configured Scheduled Tasks &amp; Crons</h2>
+        <h2>Scheduled Tasks &amp; Crons</h2>
         <span class="kpi-sub" id="cronSummaryText">OS scheduler (Task Scheduler / launchd / systemd / cron), Raven cron/heartbeat, Hermes cron</span>
       </div>
       <div class="table-wrap">
@@ -393,10 +387,10 @@
       </div>
     </div>
 
-    <!-- Section 1D: Recent Cron & Heartbeat Execution Runs -->
+    <!-- Recent cron and heartbeat runs -->
     <div class="section">
       <div class="section-header">
-        <h2>1D. Recent Cron &amp; Heartbeat Execution Runs</h2>
+        <h2>Recent Cron &amp; Heartbeat Runs</h2>
         <span class="kpi-sub">Executions inside the selected time window</span>
       </div>
       <div class="table-wrap">
@@ -423,11 +417,11 @@
       </div>
     </div>
 
-    <!-- Section 2 & 3 Side by Side: Top Tools + Top Skills -->
+    <!-- Tools and skills side by side -->
     <div class="two-col">
       <div class="section">
         <div class="section-header">
-          <h2>2. Most Used Tools Leaderboard</h2>
+          <h2>Tool Usage &amp; Latency</h2>
           <span class="kpi-sub">Ranked by execution count across all harnesses</span>
         </div>
         <div class="table-wrap">
@@ -451,7 +445,7 @@
 
       <div class="section">
         <div class="section-header">
-          <h2>3. Most Used / Loaded Skills Leaderboard</h2>
+          <h2>Skill Invocations</h2>
           <span class="kpi-sub">On-demand tool invocations + preloaded startup injections</span>
         </div>
         <div class="table-wrap">
@@ -473,10 +467,10 @@
       </div>
     </div>
 
-    <!-- Section 4: Crashes & Operational Errors -->
+    <!-- Crashes, timeouts and operational errors -->
     <div class="section">
       <div class="section-header">
-        <h2>4. Crashes, Timeouts & Normalized Operational Error Classes</h2>
+        <h2>Crashes, Timeouts &amp; Operational Errors</h2>
         <span class="kpi-sub">Includes deduplicated 5-min Hermes OAuth 400 buckets, OmniRoute 401/499/5xx, Raven 120s/600s timeouts & LiteLLM mid-stream errors</span>
       </div>
       <div class="table-wrap">
@@ -498,10 +492,10 @@
       </div>
     </div>
 
-    <!-- Section 5: Parent-to-Child Correlation Explorer -->
+    <!-- Parent-to-child correlation explorer -->
     <div class="section">
       <div class="section-header">
-        <h2>5. Parent-to-Child Multi-Harness Correlation Explorer (Raven → ACP → Child)</h2>
+        <h2>Parent-to-Child Correlation Explorer</h2>
         <span class="kpi-sub" id="corrSummaryText">Exact join via meta.json:acp_frames.session_id & audit-spans.log</span>
       </div>
       <div class="table-wrap">
@@ -674,8 +668,9 @@
       // KPI Cards
       const kpis = [
         { label: 'Active Sessions', value: fmt(s.sessions), sub: `${fmt(s.traces)} distinct traces` },
+        { label: 'Services', value: `${fmt((data.service_summary || {}).healthy || 0)} / ${fmt((data.service_summary || {}).total || 0)}`, sub: `${fmt((data.service_summary || {}).degraded || 0)} degraded • ${fmt((data.service_summary || {}).down || 0)} down` },
         { label: 'Total Spans', value: fmt(s.spans), sub: `${fmt(s.turns)} turns • ${fmt(s.llm_spans)} LLM calls` },
-        { label: 'Tool Executions', value: fmt(s.tool_calls), sub: `Across all active harnesses` },
+        { label: 'Tool Executions', value: fmt(s.tool_calls), sub: `Across all active harnesses and services` },
         { label: 'Skill Operations', value: fmt(s.skill_calls), sub: `${data.skills_ondemand.length} on-demand • ${data.skills_injected.length} startup` },
         { label: 'Total Tokens', value: fmt(s.total_tokens), sub: `In: ${fmt(s.prompt_tokens)} • Out: ${fmt(s.completion_tokens)}` },
         { label: 'Error Events', value: fmt(s.error_events), sub: `${fmt(s.error_spans)} error spans (${data.error_classes.length} classes)` },
@@ -693,7 +688,7 @@
         </div>
       `).join('');
 
-      // 1. Harnesses Table
+      // Harness activity
       const hBody = document.querySelector('#harnessTable tbody');
       hBody.innerHTML = data.harnesses
         .filter(r => !q || r.harness.toLowerCase().includes(q))
@@ -718,26 +713,39 @@
           </tr>
         `).join('');
 
-      // 1B. Hermes Profiles
-      const hpBody = document.querySelector('#hermesProfileTable tbody');
-      hpBody.innerHTML = data.hermes_profiles
-        .filter(r => !q || r.profile.toLowerCase().includes(q))
+      // Running services and gateways
+      const svcCls = (v) => ({ healthy: 'pill-ok', degraded: 'pill-warn', down: 'pill-err' }[v] || 'pill-warn');
+      document.querySelector('#servicesTable tbody').innerHTML = (data.services || [])
+        .filter(r => !q || [r.service, r.kind, r.status, r.endpoint].some(v => String(v || '').toLowerCase().includes(q)))
         .map(r => `
           <tr>
-            <td class="mono"><strong>${r.profile}</strong></td>
-            <td class="num">${fmt(r.sessions)}</td>
-            <td class="num">${fmt(r.spans)}</td>
-            <td class="num">${fmt(r.turns)}</td>
-            <td class="num">${fmt(r.tool_calls)}</td>
-            <td class="num">${fmt(r.skill_calls)}</td>
-            <td class="num">${fmt(r.total_tokens)}</td>
-            <td class="num">$${r.cost_usd.toFixed(2)}</td>
-            <td class="num"><span class="pill ${r.error_events > 0 ? 'pill-err' : 'pill-ok'}">${fmt(r.error_spans)} (${fmt(r.error_events)})</span></td>
-            <td><span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">${r.phoenix_filter}</span></td>
+            <td><span class="pill pill-harness">${esc(r.service)}</span></td>
+            <td>${esc(r.kind)}</td>
+            <td><span class="pill ${svcCls(r.status)}">${esc(r.status)}</span></td>
+            <td class="mono">${esc(r.endpoint)}</td>
+            <td class="num">${fmt(r.checks)}</td>
+            <td class="num">${fmt(r.requests)}</td>
+            <td class="num"><span class="pill ${r.errors > 0 ? 'pill-err' : 'pill-ok'}">${fmt(r.errors)}</span></td>
+            <td class="num">${fmt(r.p50_ms)} / ${fmt(r.p90_ms)}</td>
+            <td class="mono">${esc(String(r.last_seen || '-').slice(0, 19))}</td>
+            <td>${r.trace_id ? `<a class="plink" href="#" onclick="openTraceModal(&quot;${esc(r.trace_id)}&quot;);return false;">Inspect</a>` : '-'}</td>
           </tr>
         `).join('');
 
-      // 2. Top Tools
+      // Harness and service dropdown, built from the data
+      const sel = document.getElementById('harnessSelect');
+      const av = data.available || { harnesses: [], services: [] };
+      const sig = JSON.stringify(av) + '|' + currentHarness;
+      if (sel.dataset.sig !== sig) {
+        const opt = (v, t) => `<option value="${esc(v)}"${v === currentHarness ? ' selected' : ''}>${esc(t)}</option>`;
+        sel.innerHTML = '<option value="all">All harnesses and services</option>'
+          + (av.harnesses.length ? `<optgroup label="Harnesses">${av.harnesses.map(h => opt(h, h)).join('')}</optgroup>` : '')
+          + (av.services.length ? `<optgroup label="Services">${av.services.map(x => opt(x.name, `${x.name} (${x.kind})`)).join('')}</optgroup>` : '');
+        sel.value = currentHarness;
+        sel.dataset.sig = sig;
+      }
+
+      // Tool usage
       const tBody = document.querySelector('#toolsTable tbody');
       tBody.innerHTML = data.top_tools
         .filter(r => !q || r.tool_name.toLowerCase().includes(q) || r.harness.toLowerCase().includes(q))
@@ -757,7 +765,7 @@
           </tr>
         `).join('');
 
-      // 3. Skills
+      // Skill invocations
       const sBody = document.querySelector('#skillsTable tbody');
       const allSkills = [
         ...data.skills_ondemand.map(x => ({...x, badgeCls: 'pill-ok'})),
@@ -779,7 +787,7 @@
         </tr>
       `).join('');
 
-      // 4. Errors
+      // Errors
       const eBody = document.querySelector('#errorsTable tbody');
       eBody.innerHTML = data.error_classes
         .filter(r => !q || r.error_class.toLowerCase().includes(q) || r.harness.toLowerCase().includes(q) || (r.sample_msg || '').toLowerCase().includes(q))
@@ -799,7 +807,7 @@
           </tr>
         `).join('');
 
-      // 5. Correlation Runs
+      // Correlation Runs
       const cSummary = data.correlation_summary.map(c => `${c.child_harness}: ${c.cnt} runs (${c.distinct_sessions} sessions, ${c.confidence})`).join(' • ');
       document.getElementById('corrSummaryText').textContent = cSummary || 'No linked runs in window';
       const cBody = document.querySelector('#corrTable tbody');
@@ -822,7 +830,7 @@
           </tr>
         `).join('');
 
-      // 1C / 1D. Scheduled tasks & crons
+      // Scheduled tasks and crons
       document.getElementById('cronSummaryText').textContent =
         `${cr.summary.total_configured || 0} configured • ${cr.summary.enabled_count || 0} enabled • ${cr.summary.failed_schedules || 0} failing`;
       const statusPill = (v) => {
@@ -893,6 +901,23 @@
     });
 
     document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+
+    document.getElementById('reportBtn').addEventListener('click', async () => {
+      const t = document.getElementById('toast');
+      try {
+        const svc = currentHarness !== 'all' ? `?service=${encodeURIComponent(currentHarness)}` : '';
+        const d = await (await fetch(`/api/bug-report${svc}`)).json();
+        try { await navigator.clipboard.writeText(d.markdown); } catch (e) { /* clipboard may be blocked */ }
+        t.textContent = 'Diagnostic bundle copied. Paste it into the issue form if the fields are empty.';
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 4000);
+        window.open(d.url, '_blank', 'noopener');
+      } catch (e) {
+        t.textContent = `Could not build the bug report: ${e.message}`;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 4000);
+      }
+    });
 
     loadDashboard();
     setInterval(loadDashboard, 15000);
