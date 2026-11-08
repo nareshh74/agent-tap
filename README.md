@@ -9,6 +9,16 @@ agent-tap tails the logs and databases your coding agents already write and corr
 - **Local and private**: prompt text is **not** stored unless you opt in ([docs/privacy.md](docs/privacy.md)). Runtime dependencies are `platformdirs`, `fastapi` and `uvicorn`.
 - **Extensible**: six built-in adapters, a declarative TOML adapter for anything else, and a Python entry-point plugin API.
 
+<p align="center">
+  <a href="assets/agent-tap-demo.mp4"><img src="assets/agent-tap-demo.gif" alt="agent-tap demo: dashboard, error classes, scheduled tasks and a parent-to-child trace drawer" width="800"></a>
+</p>
+
+[Watch the narrated walkthrough (MP4, 60 s)](assets/agent-tap-demo.mp4). The data shown is synthetic.
+
+| Usage analytics across harnesses | Trace drawer and scheduled tasks |
+|---|---|
+| ![Dashboard overview with KPI cards and per-harness table](assets/dashboard-overview.png) | ![Scheduled tasks and crons with the parent-to-child trace drawer open](assets/trace-drawer-and-crons.png) |
+
 ## Get started
 
 Python 3.11+ on Linux, macOS and Windows (including WSL2).
