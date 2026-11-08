@@ -1,0 +1,22 @@
+# Cline / Roo Code: task transcripts stored by the VS Code extension (one JSON array per task).
+# Adjust the glob for your extension id (saoudrizwan.claude-dev for Cline, rooveterinaryinc.roo-cline for Roo Code).
+name = "cline"
+kind = "json_array"
+
+[source]
+paths = [
+  "~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/tasks/*/ui_messages.json",
+  "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/tasks/*/ui_messages.json",
+  "$APPDATA/Code/User/globalStorage/saoudrizwan.claude-dev/tasks/*/ui_messages.json",
+]
+
+[map]
+timestamp = "ts"                       # epoch milliseconds
+name = "say"
+id = "ts"
+session_id = "_dir"                    # task folder name
+output = "text"
+span_kind_default = "CHAIN"
+
+[where]
+type = "say"

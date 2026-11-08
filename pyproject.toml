@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-tap"
+version = "0.2.0"
+description = "Local-first, near-real-time session analytics for AI coding agents (Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute and more)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["agents", "observability", "claude-code", "codex", "copilot", "analytics", "sqlite"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+]
+dependencies = ["platformdirs>=3.0", "fastapi>=0.100", "uvicorn>=0.23"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.24", "build", "twine"]
+
+[project.scripts]
+agent-tap = "agent_tap.cli:main"
+
+[project.entry-points."agent_tap.harnesses"]
+raven = "agent_tap.adapters.raven:RavenAdapter"
+hermes = "agent_tap.adapters.hermes:HermesAdapter"
+claude-code = "agent_tap.adapters.claude_code:ClaudeCodeAdapter"
+codex = "agent_tap.adapters.codex:CodexAdapter"
+copilot-cli = "agent_tap.adapters.copilot_cli:CopilotCliAdapter"
+omniroute = "agent_tap.adapters.omniroute:OmniRouteAdapter"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agent_tap = ["dashboard/static/*", "examples/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

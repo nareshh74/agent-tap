@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>agent-tap KPI Dashboard — Correlated Session & Error Analytics</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #131b2e;
+      --panel-alt: #182238;
+      --border: #26334d;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-group {
+      display: inline-flex;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .btn-group button {
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      padding: 6px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-group button.active, .btn-group button:hover {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    select, input[type="search"] {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .btn {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-primary {
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--accent);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    main {
+      max-width: 1680px;
+      margin: 0 auto;
+      padding: 20px 24px 60px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .kpi-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+    .kpi-value {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 4px 0 2px;
+      color: #f8fafc;
+    }
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 22px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 12px 16px;
+      background: var(--panel-alt);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .section-header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(38, 51, 77, 0.65);
+      white-space: nowrap;
+    }
+    th {
+      background: #111827;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    tr:hover td { background: rgba(56, 189, 248, 0.05); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-harness { background: rgba(168, 85, 247, 0.16); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.35); }
+    .pill-err { background: rgba(239, 68, 68, 0.16); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+    .pill-ok { background: rgba(34, 197, 94, 0.16); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35); }
+    .pill-warn { background: rgba(245, 158, 11, 0.16); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.35); }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 1200px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+    .copy-chip {
+      background: #0f172a;
+      color: #93c5fd;
+      border: 1px solid #1e3a8a;
+      padding: 2px 7px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .copy-chip:hover { background: #1e3a8a; color: #fff; }
+    a.plink { color: var(--accent); text-decoration: none; font-weight: 600; }
+    a.plink:hover { text-decoration: underline; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0284c7;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      display: none;
+      z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: var(--accent); }
+    th.sort-active { color: var(--accent); background: #17243d; }
+    .sort-ind { margin-left: 4px; font-size: 10px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none; z-index: 200; }
+    .modal-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(860px, 96vw); background: var(--panel); border-left: 1px solid var(--border); display: none; flex-direction: column; z-index: 210; box-shadow: -8px 0 32px rgba(0,0,0,0.5); }
+    .modal-head { padding: 12px 16px; background: var(--panel-alt); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .modal-head h2 { margin: 0; font-size: 14px; }
+    .modal-body { padding: 12px 16px; overflow: auto; flex: 1; }
+    pre.attrs { background: #0b1220; border: 1px solid var(--border); border-radius: 6px; padding: 8px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; font-size: 11px; margin: 4px 0 12px; }
+    .msg-cell {
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>agent-tap KPI Dashboard</h1>
+      <span class="badge" id="statusBadge">Loading...</span>
+    </div>
+    <div class="controls">
+      <div class="btn-group" id="hoursGroup">
+        <button data-hours="1">1h</button>
+        <button data-hours="6">6h</button>
+        <button data-hours="24" class="active">24h</button>
+        <button data-hours="48">48h</button>
+        <button data-hours="168">7d</button>
+        <button data-hours="720">30d</button>
+        <button data-hours="2160">90d</button>
+      </div>
+      <select id="harnessSelect" title="Filter by Harness">
+        <option value="all">All Harnesses</option>
+        <option value="raven">raven (Main + Nodes)</option>
+        <option value="raven-acp">raven-acp (Subagents)</option>
+        <option value="hermes">hermes (all profiles)</option>
+        <option value="claude">claude (Claude Code)</option>
+        <option value="codex">codex (Codex CLI)</option>
+        <option value="copilot">copilot (GitHub Copilot)</option>
+        <option value="omniroute">omniroute (LLM Router)</option>
+      </select>
+      <input type="search" id="globalSearch" placeholder="Filter tools, skills, errors, sessions..." />
+      <button class="btn" id="refreshBtn">Refresh Now</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- Section 1: Per-Harness Summary + Hermes 15-Profile Drilldown -->
+    <div class="section">
+      <div class="section-header">
+        <h2>1. Per-Harness Activity & Telemetry Summary</h2>
+        <span class="kpi-sub">Click any filter chip to copy the exact span filter expression</span>
+      </div>
+      <div class="table-wrap">
+        <table id="harnessTable">
+          <thead>
+            <tr>
+              <th>Harness</th>
+              <th class="num">Sessions</th>
+              <th class="num">Traces</th>
+              <th class="num">Total Spans</th>
+              <th class="num">Turns</th>
+              <th class="num">LLM Calls</th>
+              <th class="num">Tool Calls</th>
+              <th class="num">Skill Spans</th>
+              <th class="num">Prompt Tokens</th>
+              <th class="num">Completion Tokens</th>
+              <th class="num">Total Tokens</th>
+              <th class="num">Error Spans (Events)</th>
+              <th class="num">Latency p50 / p90 (ms)</th>
+              <th>Filter</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 1B: Hermes 15-Profile Breakdown -->
+    <div class="section">
+      <div class="section-header">
+        <h2>1B. Hermes 15-Profile Breakdown (state.db + errors.log)</h2>
+        <span class="kpi-sub">All active Hermes profiles polled read-only</span>
+      </div>
+      <div class="table-wrap">
+        <table id="hermesProfileTable">
+          <thead>
+            <tr>
+              <th>Hermes Profile</th>
+              <th class="num">Sessions</th>
+              <th class="num">Spans</th>
+              <th class="num">Turns</th>
+              <th class="num">Tool Calls</th>
+              <th class="num">Skill Spans</th>
+              <th class="num">Total Tokens</th>
+              <th class="num">Est. Cost (USD)</th>
+              <th class="num">Error Spans (Events)</th>
+              <th>Filter</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 1C: Configured Scheduled Tasks & Crons -->
+    <div class="section">
+      <div class="section-header">
+        <h2>1C. Configured Scheduled Tasks &amp; Crons</h2>
+        <span class="kpi-sub" id="cronSummaryText">OS scheduler (Task Scheduler / launchd / systemd / cron), Raven cron/heartbeat, Hermes cron</span>
+      </div>
+      <div class="table-wrap">
+        <table id="cronConfigTable">
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Harness</th>
+              <th>Profile</th>
+              <th>Name / ID</th>
+              <th>Schedule</th>
+              <th>State</th>
+              <th>Last Run (UTC)</th>
+              <th>Next Run (UTC)</th>
+              <th>Last Status</th>
+              <th class="num">Exit Code</th>
+              <th class="num">Total Runs</th>
+              <th>Command / Prompt / Last Error</th>
+              <th>Inspect</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 1D: Recent Cron & Heartbeat Execution Runs -->
+    <div class="section">
+      <div class="section-header">
+        <h2>1D. Recent Cron &amp; Heartbeat Execution Runs</h2>
+        <span class="kpi-sub">Executions inside the selected time window</span>
+      </div>
+      <div class="table-wrap">
+        <table id="cronRunsTable">
+          <thead>
+            <tr>
+              <th>Started (UTC)</th>
+              <th>Source</th>
+              <th>Harness</th>
+              <th>Profile</th>
+              <th>Job / Session</th>
+              <th>Status</th>
+              <th class="num">Duration (s)</th>
+              <th class="num">Turns</th>
+              <th class="num">Tools</th>
+              <th class="num">Tokens</th>
+              <th class="num">Errors</th>
+              <th>Summary / Error</th>
+              <th>Inspect</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 2 & 3 Side by Side: Top Tools + Top Skills -->
+    <div class="two-col">
+      <div class="section">
+        <div class="section-header">
+          <h2>2. Most Used Tools Leaderboard</h2>
+          <span class="kpi-sub">Ranked by execution count across all harnesses</span>
+        </div>
+        <div class="table-wrap">
+          <table id="toolsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Harness</th>
+                <th>Tool Name</th>
+                <th class="num">Calls</th>
+                <th class="num">Errors</th>
+                <th class="num">Err %</th>
+                <th class="num">p50 / p90 (ms)</th>
+                <th>Inspect</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <h2>3. Most Used / Loaded Skills Leaderboard</h2>
+          <span class="kpi-sub">On-demand tool invocations + preloaded startup injections</span>
+        </div>
+        <div class="table-wrap">
+          <table id="skillsTable">
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th>Harness</th>
+                <th>Skill / Operation</th>
+                <th class="num">Count</th>
+                <th class="num">Errors</th>
+                <th>Last Seen (UTC)</th>
+                <th>Inspect</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Crashes & Operational Errors -->
+    <div class="section">
+      <div class="section-header">
+        <h2>4. Crashes, Timeouts & Normalized Operational Error Classes</h2>
+        <span class="kpi-sub">Includes deduplicated 5-min Hermes OAuth 400 buckets, OmniRoute 401/499/5xx, Raven 120s/600s timeouts & LiteLLM mid-stream errors</span>
+      </div>
+      <div class="table-wrap">
+        <table id="errorsTable">
+          <thead>
+            <tr>
+              <th>Harness</th>
+              <th>Profile</th>
+              <th>Error Class (error.class)</th>
+              <th class="num">Event Count</th>
+              <th class="num">Spans</th>
+              <th>Latest (UTC)</th>
+              <th>Sample Error Message</th>
+              <th>Inspect</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 5: Parent-to-Child Correlation Explorer -->
+    <div class="section">
+      <div class="section-header">
+        <h2>5. Parent-to-Child Multi-Harness Correlation Explorer (Raven → ACP → Child)</h2>
+        <span class="kpi-sub" id="corrSummaryText">Exact join via meta.json:acp_frames.session_id & audit-spans.log</span>
+      </div>
+      <div class="table-wrap">
+        <table id="corrTable">
+          <thead>
+            <tr>
+              <th>Started (UTC)</th>
+              <th>Raven Parent Session</th>
+              <th>Raven Node (call_id)</th>
+              <th>Child Harness</th>
+              <th>Child Session ID</th>
+              <th>Confidence</th>
+              <th class="num">Duration (s)</th>
+              <th class="num">Child Spans</th>
+              <th class="num">Child Tools</th>
+              <th class="num">Child Tokens</th>
+              <th class="num">Child Errors</th>
+              <th>Inspect</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="traceBackdrop" onclick="closeTraceModal()"></div>
+  <div class="modal-drawer" id="traceDrawer">
+    <div class="modal-head">
+      <h2 id="traceTitle">Inspect Trace / Spans</h2>
+      <button class="btn" onclick="closeTraceModal()">Close ✕</button>
+    </div>
+    <div class="modal-body" id="traceBody"></div>
+  </div>
+
+  <div class="toast" id="toast">Copied filter to clipboard!</div>
+
+  <script>
+    let currentHours = 24;
+    let currentHarness = 'all';
+    let lastData = null;
+
+    const fmt = (n) => (n === null || n === undefined) ? '-' : Number(n).toLocaleString();
+
+
+    const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const sortState = {};
+
+    function parseCell(text) {
+      const t = (text || '').replace(/[▲▼]/g, '').trim();
+      if (t === '' || t === '-') return { k: 'null' };
+      if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(t)) {
+        const ms = Date.parse(t.replace(' ', 'T').slice(0, 19) + 'Z');
+        if (!isNaN(ms)) return { k: 'num', v: ms };
+      }
+      const m = t.match(/^\$?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(?:%|s|ms)?(?:\s*[\/(].*)?$/);
+      if (m) return { k: 'num', v: parseFloat(m[1].replace(/,/g, '')) };
+      return { k: 'str', v: t.toLowerCase() };
+    }
+
+    function updateSortIndicators(table) {
+      const st = sortState[table.id];
+      table.querySelectorAll('thead th').forEach((th, i) => {
+        let ind = th.querySelector('.sort-ind');
+        if (!ind) { ind = document.createElement('span'); ind.className = 'sort-ind'; th.appendChild(ind); }
+        const active = st && st.colIndex === i;
+        th.classList.toggle('sort-active', !!active);
+        ind.textContent = active ? (st.dir === 'asc' ? '▲' : '▼') : '';
+      });
+    }
+
+    function applySort(tableId) {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      updateSortIndicators(table);
+      const st = sortState[tableId];
+      if (!st) return;
+      const tbody = table.querySelector('tbody');
+      const sign = st.dir === 'asc' ? 1 : -1;
+      const rows = Array.from(tbody.rows).map((tr, i) => ({ tr, i, c: parseCell(tr.cells[st.colIndex] ? tr.cells[st.colIndex].textContent : '') }));
+      rows.sort((a, b) => {
+        if (a.c.k === 'null' || b.c.k === 'null') {
+          if (a.c.k === b.c.k) return a.i - b.i;
+          return a.c.k === 'null' ? 1 : -1;
+        }
+        let d;
+        if (a.c.k === 'num' && b.c.k === 'num') d = a.c.v - b.c.v;
+        else if (a.c.k !== b.c.k) d = a.c.k === 'num' ? -1 : 1;
+        else d = a.c.v < b.c.v ? -1 : (a.c.v > b.c.v ? 1 : 0);
+        return d === 0 ? a.i - b.i : d * sign;
+      });
+      rows.forEach(r => tbody.appendChild(r.tr));
+    }
+
+    document.querySelectorAll('table[id] thead th').forEach((th) => {
+      th.classList.add('sortable');
+      th.addEventListener('click', () => {
+        const table = th.closest('table');
+        const colIndex = Array.from(th.parentNode.children).indexOf(th);
+        const cur = sortState[table.id];
+        const dir = cur && cur.colIndex === colIndex && cur.dir === 'asc' ? 'desc' : 'asc';
+        sortState[table.id] = { colIndex, dir };
+        applySort(table.id);
+      });
+    });
+
+    function closeTraceModal() {
+      document.getElementById('traceBackdrop').style.display = 'none';
+      document.getElementById('traceDrawer').style.display = 'none';
+    }
+
+    async function openTraceModal(traceId, key, kind) {
+      const body = document.getElementById('traceBody');
+      document.getElementById('traceTitle').textContent = `Inspect Trace / Spans — ${traceId || key || ''}`;
+      document.getElementById('traceBackdrop').style.display = 'block';
+      document.getElementById('traceDrawer').style.display = 'flex';
+      body.textContent = 'Loading...';
+      const qs = new URLSearchParams({ hours: currentHours });
+      if (kind && key) qs.set(kind, key);
+      try {
+        const resp = await fetch(`/api/trace/${encodeURIComponent(traceId || '_')}?${qs}`);
+        const d = await resp.json();
+        if (!d.spans.length) {
+          body.innerHTML = '<p class="kpi-sub">No spans recorded for this trace / filter in the local store.</p>';
+          return;
+        }
+        body.innerHTML = `<p class="kpi-sub">${d.spans.length} span(s)${d.truncated ? ' (truncated)' : ''}</p>` + d.spans.map(sp => `
+          <div>
+            <div><strong class="mono">${esc(sp.name)}</strong>
+              <span class="pill pill-harness">${esc(sp.harness)}</span>
+              <span class="pill ${sp.status_code === 'ERROR' ? 'pill-err' : 'pill-ok'}">${esc(sp.status_code)}</span>
+              <span class="kpi-sub">${esc(sp.kind)} • ${esc(sp.start_time)} • ${sp.duration_ms === null ? '-' : Math.round(sp.duration_ms) + ' ms'} • trace ${esc(sp.trace_id)}</span></div>
+            ${sp.status_message ? `<div class="kpi-sub">${esc(sp.status_message)}</div>` : ''}
+            <pre class="attrs">${esc(sp.attributes)}</pre>
+          </div>`).join('');
+      } catch (e) {
+        body.textContent = `Error: ${e.message}`;
+      }
+    }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTraceModal(); });
+
+    function copyFilter(expr) {
+      navigator.clipboard.writeText(expr);
+      const t = document.getElementById('toast');
+      t.textContent = `Copied filter: ${expr}`;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 2600);
+    }
+
+    async function loadDashboard() {
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = 'Refreshing...';
+      try {
+        const resp = await fetch(`/api/digest?hours=${currentHours}&harness=${encodeURIComponent(currentHarness)}`);
+        const data = await resp.json();
+        lastData = data;
+        renderDashboard(data);
+        badge.textContent = `Live • Updated ${data.generated_at} (${data.window_hours}h window)`;
+      } catch (e) {
+        badge.textContent = `Error loading: ${e.message}`;
+      }
+    }
+
+    function renderDashboard(data) {
+      const q = (document.getElementById('globalSearch').value || '').toLowerCase().trim();
+      const s = data.summary;
+      const cr = data.crons || { summary: {}, configured_schedules: [], recent_runs: [] };
+
+      // KPI Cards
+      const kpis = [
+        { label: 'Active Sessions', value: fmt(s.sessions), sub: `${fmt(s.traces)} distinct traces` },
+        { label: 'Total Spans', value: fmt(s.spans), sub: `${fmt(s.turns)} turns • ${fmt(s.llm_spans)} LLM calls` },
+        { label: 'Tool Executions', value: fmt(s.tool_calls), sub: `Across all active harnesses` },
+        { label: 'Skill Operations', value: fmt(s.skill_calls), sub: `${data.skills_ondemand.length} on-demand • ${data.skills_injected.length} startup` },
+        { label: 'Total Tokens', value: fmt(s.total_tokens), sub: `In: ${fmt(s.prompt_tokens)} • Out: ${fmt(s.completion_tokens)}` },
+        { label: 'Error Events', value: fmt(s.error_events), sub: `${fmt(s.error_spans)} error spans (${data.error_classes.length} classes)` },
+        { label: 'Latency p50 / p90', value: `${fmt(s.latency_p50_ms)} / ${fmt(s.latency_p90_ms)} ms`, sub: `TTFT p50/p90: ${fmt(s.ttft_p50_ms)} / ${fmt(s.ttft_p90_ms)} ms` },
+        { label: 'Configured Schedules', value: fmt(cr.summary.total_configured), sub: `${fmt(cr.summary.enabled_count)} enabled` },
+        { label: 'Recent Runs', value: fmt(cr.summary.recent_runs_count), sub: `${fmt(cr.summary.recent_runs_with_errors)} with errors` },
+        { label: 'Failed Schedules / Runs', value: `${fmt(cr.summary.failed_schedules)} / ${fmt(cr.summary.recent_runs_with_errors)}`, sub: `${fmt(cr.summary.approval_timeout_count)} approval timeouts • ${fmt(cr.summary.outlet_dropped_count)} dropped outlets` },
+        { label: 'Correlated Subagent Runs', value: fmt(s.correlated_runs), sub: `100% exact ID join (Raven → Child)` },
+      ];
+      document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+        <div class="kpi-card">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-value">${k.value}</div>
+          <div class="kpi-sub">${k.sub}</div>
+        </div>
+      `).join('');
+
+      // 1. Harnesses Table
+      const hBody = document.querySelector('#harnessTable tbody');
+      hBody.innerHTML = data.harnesses
+        .filter(r => !q || r.harness.toLowerCase().includes(q))
+        .map(r => `
+          <tr>
+            <td><span class="pill pill-harness">${r.harness}</span></td>
+            <td class="num">${fmt(r.sessions)}</td>
+            <td class="num">${fmt(r.traces)}</td>
+            <td class="num">${fmt(r.spans)}</td>
+            <td class="num">${fmt(r.turns)}</td>
+            <td class="num">${fmt(r.llm_spans)}</td>
+            <td class="num">${fmt(r.tool_calls)}</td>
+            <td class="num">${fmt(r.skill_calls)}</td>
+            <td class="num">${fmt(r.prompt_tokens)}</td>
+            <td class="num">${fmt(r.completion_tokens)}</td>
+            <td class="num"><strong>${fmt(r.total_tokens)}</strong></td>
+            <td class="num"><span class="pill ${r.error_events > 0 ? 'pill-err' : 'pill-ok'}">${fmt(r.error_spans)} (${fmt(r.error_events)})</span></td>
+            <td class="num">${fmt(r.p50_ms)} / ${fmt(r.p90_ms)}</td>
+            <td>
+              <span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">Copy Filter</span>
+            </td>
+          </tr>
+        `).join('');
+
+      // 1B. Hermes Profiles
+      const hpBody = document.querySelector('#hermesProfileTable tbody');
+      hpBody.innerHTML = data.hermes_profiles
+        .filter(r => !q || r.profile.toLowerCase().includes(q))
+        .map(r => `
+          <tr>
+            <td class="mono"><strong>${r.profile}</strong></td>
+            <td class="num">${fmt(r.sessions)}</td>
+            <td class="num">${fmt(r.spans)}</td>
+            <td class="num">${fmt(r.turns)}</td>
+            <td class="num">${fmt(r.tool_calls)}</td>
+            <td class="num">${fmt(r.skill_calls)}</td>
+            <td class="num">${fmt(r.total_tokens)}</td>
+            <td class="num">$${r.cost_usd.toFixed(2)}</td>
+            <td class="num"><span class="pill ${r.error_events > 0 ? 'pill-err' : 'pill-ok'}">${fmt(r.error_spans)} (${fmt(r.error_events)})</span></td>
+            <td><span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">${r.phoenix_filter}</span></td>
+          </tr>
+        `).join('');
+
+      // 2. Top Tools
+      const tBody = document.querySelector('#toolsTable tbody');
+      tBody.innerHTML = data.top_tools
+        .filter(r => !q || r.tool_name.toLowerCase().includes(q) || r.harness.toLowerCase().includes(q))
+        .map((r, i) => `
+          <tr>
+            <td class="num">${i + 1}</td>
+            <td><span class="pill pill-harness">${r.harness}</span></td>
+            <td class="mono"><strong>${r.tool_name}</strong></td>
+            <td class="num"><strong>${fmt(r.calls)}</strong></td>
+            <td class="num">${r.errors > 0 ? `<span class="pill pill-err">${fmt(r.errors)}</span>` : '0'}</td>
+            <td class="num">${r.error_rate_pct}%</td>
+            <td class="num">${fmt(r.p50_ms)} / ${fmt(r.p90_ms)}</td>
+            <td>
+              <span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">Filter</span>
+              <a class="plink" style="margin-left:6px" href="#" onclick="openTraceModal(&quot;${esc(r.trace_id)}&quot;, &quot;${esc(r.tool_name || r.error_class || '')}&quot;, &quot;${r.error_class ? 'error_class' : (r.tool_name ? 'tool_name' : '')}&quot;);return false;">Inspect</a>
+            </td>
+          </tr>
+        `).join('');
+
+      // 3. Skills
+      const sBody = document.querySelector('#skillsTable tbody');
+      const allSkills = [
+        ...data.skills_ondemand.map(x => ({...x, badgeCls: 'pill-ok'})),
+        ...data.skills_injected.map(x => ({...x, errors: 0, badgeCls: 'pill-warn'})),
+      ].filter(r => !q || r.skill_name.toLowerCase().includes(q) || r.harness.toLowerCase().includes(q));
+
+      sBody.innerHTML = allSkills.map(r => `
+        <tr>
+          <td><span class="pill ${r.badgeCls}">${r.category}</span></td>
+          <td><span class="pill pill-harness">${r.harness}</span></td>
+          <td class="mono"><strong>${r.skill_name}</strong></td>
+          <td class="num"><strong>${fmt(r.count)}</strong></td>
+          <td class="num">${r.errors ? `<span class="pill pill-err">${r.errors}</span>` : '0'}</td>
+          <td class="mono">${(r.last_seen || '').slice(0, 19)}</td>
+          <td>
+            <span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">Filter</span>
+            <a class="plink" style="margin-left:6px" href="#" onclick="openTraceModal(&quot;${esc(r.trace_id)}&quot;, &quot;${esc(r.tool_name || r.error_class || '')}&quot;, &quot;${r.error_class ? 'error_class' : (r.tool_name ? 'tool_name' : '')}&quot;);return false;">Inspect</a>
+          </td>
+        </tr>
+      `).join('');
+
+      // 4. Errors
+      const eBody = document.querySelector('#errorsTable tbody');
+      eBody.innerHTML = data.error_classes
+        .filter(r => !q || r.error_class.toLowerCase().includes(q) || r.harness.toLowerCase().includes(q) || (r.sample_msg || '').toLowerCase().includes(q))
+        .map(r => `
+          <tr>
+            <td><span class="pill pill-harness">${r.harness}</span></td>
+            <td class="mono">${r.profile}</td>
+            <td class="mono"><span class="pill pill-err">${r.error_class}</span></td>
+            <td class="num"><strong>${fmt(r.events)}</strong></td>
+            <td class="num">${fmt(r.spans)}</td>
+            <td class="mono">${(r.last_seen || '').slice(0, 19)}</td>
+            <td class="msg-cell" title="${(r.sample_msg || '').replace(/"/g, '&quot;')}">${(r.sample_msg || '-').replace(/</g, '&lt;')}</td>
+            <td>
+              <span class="copy-chip" onclick="copyFilter(&quot;${r.phoenix_filter}&quot;)">Filter</span>
+              <a class="plink" style="margin-left:6px" href="#" onclick="openTraceModal(&quot;${esc(r.trace_id)}&quot;, &quot;${esc(r.tool_name || r.error_class || '')}&quot;, &quot;${r.error_class ? 'error_class' : (r.tool_name ? 'tool_name' : '')}&quot;);return false;">Inspect</a>
+            </td>
+          </tr>
+        `).join('');
+
+      // 5. Correlation Runs
+      const cSummary = data.correlation_summary.map(c => `${c.child_harness}: ${c.cnt} runs (${c.distinct_sessions} sessions, ${c.confidence})`).join(' • ');
+      document.getElementById('corrSummaryText').textContent = cSummary || 'No linked runs in window';
+      const cBody = document.querySelector('#corrTable tbody');
+      cBody.innerHTML = data.correlation_runs
+        .filter(r => !q || r.raven_call_id.toLowerCase().includes(q) || r.child_harness.toLowerCase().includes(q) || r.child_session_id.toLowerCase().includes(q) || r.raven_session_key.toLowerCase().includes(q))
+        .map(r => `
+          <tr>
+            <td class="mono">${r.started_at}</td>
+            <td class="mono">${r.raven_session_key}</td>
+            <td class="mono"><strong>${r.raven_call_id}</strong></td>
+            <td><span class="pill pill-harness">${r.child_harness}</span></td>
+            <td class="mono" title="${r.child_session_id}">${r.child_session_id.slice(0, 28)}</td>
+            <td><span class="pill pill-ok">${r.confidence}</span></td>
+            <td class="num">${r.duration_s !== null ? r.duration_s + 's' : 'running'}</td>
+            <td class="num">${fmt(r.child_spans)}</td>
+            <td class="num">${fmt(r.child_tool_calls)}</td>
+            <td class="num">${fmt(r.child_tokens)}</td>
+            <td class="num">${r.child_errors > 0 ? `<span class="pill pill-err">${r.child_errors}</span>` : '0'}</td>
+            <td><a class="plink" href="#" onclick="openTraceModal(&quot;${esc(r.trace_id)}&quot;);return false;">Inspect Trace / Spans</a></td>
+          </tr>
+        `).join('');
+
+      // 1C / 1D. Scheduled tasks & crons
+      document.getElementById('cronSummaryText').textContent =
+        `${cr.summary.total_configured || 0} configured • ${cr.summary.enabled_count || 0} enabled • ${cr.summary.failed_schedules || 0} failing`;
+      const statusPill = (v) => {
+        const t = String(v == null ? '-' : v);
+        const l = t.toLowerCase();
+        const cls = ['ok', 'ready', 'running', 'scheduled', 'completed', 'active', 'idle'].includes(l) ? 'pill-ok' : (l.startsWith('warn') || l === 'never_run' || l === '-' ? 'pill-warn' : 'pill-err');
+        return `<span class="pill ${cls}">${esc(t)}</span>`;
+      };
+      const inspectBtn = (id) => `<a class="plink" href="#" onclick="openTraceModal(&quot;${esc(id)}&quot;);return false;">Inspect</a>`;
+      document.querySelector('#cronConfigTable tbody').innerHTML = (cr.configured_schedules || [])
+        .filter(r => !q || [r.source, r.harness, r.profile, r.name, r.id, r.command_or_prompt, r.last_error].some(v => String(v || '').toLowerCase().includes(q)))
+        .map(r => `
+          <tr>
+            <td>${esc(r.source)}</td>
+            <td><span class="pill pill-harness">${esc(r.harness)}</span></td>
+            <td class="mono">${esc(r.profile)}</td>
+            <td class="mono" title="${esc(r.id)}"><strong>${esc(r.name)}</strong></td>
+            <td class="mono">${esc(r.schedule)}</td>
+            <td>${statusPill(r.state)}</td>
+            <td class="mono">${esc(r.last_run || '-')}</td>
+            <td class="mono">${esc(r.next_run || '-')}</td>
+            <td>${statusPill(r.last_status)}</td>
+            <td class="num">${r.exit_code === null || r.exit_code === undefined ? '-' : r.exit_code}</td>
+            <td class="num">${fmt(r.total_runs)}</td>
+            <td class="msg-cell" title="${esc((r.command_or_prompt || '') + (r.last_error ? ' | ERROR: ' + r.last_error : ''))}">${esc(r.last_error ? 'ERROR: ' + r.last_error : (r.command_or_prompt || '-'))}</td>
+            <td>${inspectBtn(r.trace_id)}</td>
+          </tr>
+        `).join('');
+      document.querySelector('#cronRunsTable tbody').innerHTML = (cr.recent_runs || [])
+        .filter(r => !q || [r.source, r.harness, r.profile, r.job_name, r.session_id, r.summary].some(v => String(v || '').toLowerCase().includes(q)))
+        .map(r => `
+          <tr>
+            <td class="mono">${esc(r.started_at)}</td>
+            <td>${esc(r.source)}</td>
+            <td><span class="pill pill-harness">${esc(r.harness)}</span></td>
+            <td class="mono">${esc(r.profile)}</td>
+            <td class="mono" title="${esc(r.session_id)}">${esc(r.job_name)}</td>
+            <td>${statusPill(r.status)}</td>
+            <td class="num">${r.duration_s === null || r.duration_s === undefined ? '-' : r.duration_s + 's'}</td>
+            <td class="num">${fmt(r.turns)}</td>
+            <td class="num">${fmt(r.tool_calls)}</td>
+            <td class="num">${fmt(r.tokens)}</td>
+            <td class="num">${r.errors > 0 ? `<span class="pill pill-err">${fmt(r.errors)}</span>` : '0'}</td>
+            <td class="msg-cell" title="${esc(r.summary)}">${esc(r.summary || '-')}</td>
+            <td>${inspectBtn(r.trace_id)}</td>
+          </tr>
+        `).join('');
+
+      document.querySelectorAll('table[id]').forEach(t => applySort(t.id));
+    }
+
+    document.querySelectorAll('#hoursGroup button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#hoursGroup button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentHours = parseFloat(btn.dataset.hours);
+        loadDashboard();
+      });
+    });
+
+    document.getElementById('harnessSelect').addEventListener('change', (e) => {
+      currentHarness = e.target.value;
+      loadDashboard();
+    });
+
+    document.getElementById('globalSearch').addEventListener('input', () => {
+      if (lastData) renderDashboard(lastData);
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+
+    loadDashboard();
+    setInterval(loadDashboard, 15000);
+  </script>
+</body>
+</html>

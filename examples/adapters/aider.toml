@@ -1,0 +1,16 @@
+# Aider: tails the analytics log written by `aider --analytics-log ~/.aider/analytics.jsonl`.
+name = "aider"
+kind = "jsonl"
+
+[source]
+paths = ["~/.aider/analytics.jsonl"]
+
+[map]
+timestamp = "time"                     # epoch seconds
+name = "event"
+session_id = "user_id"
+model = "properties.main_model"
+tokens_prompt = "properties.prompt_tokens"
+tokens_completion = "properties.completion_tokens"
+error = "properties.error"
+span_kind_default = "CHAIN"
