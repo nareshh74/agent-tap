@@ -66,8 +66,8 @@ def load_adapters(config: Config) -> list[HarnessAdapter]:
     from .declarative import load_declarative_adapters
 
     adapters += load_declarative_adapters(config.adapters_dir)
-    if config.adapters is not None:
-        adapters = [a for a in adapters if a.name in config.adapters]
+    if config.enabled_harnesses is not None:
+        adapters = [a for a in adapters if a.name in config.enabled_harnesses]
     return adapters
 
 

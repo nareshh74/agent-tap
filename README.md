@@ -17,14 +17,27 @@ They are complementary; use whichever answers your question.
 Python 3.11+ on Linux, macOS, Windows (and WSL2).
 
 ```bash
-uvx agent-tap doctor            # or: pipx run agent-tap doctor
-pipx install agent-tap          # or: pip install agent-tap
+# Not on PyPI yet: install straight from GitHub
+pipx install git+https://github.com/nareshh74/agent-tap   # or: uvx --from git+https://github.com/nareshh74/agent-tap agent-tap doctor
+agent-tap init                  # choose which harnesses to track, confirm paths, opt in/out of prompt text
 agent-tap run --once            # collect once
 agent-tap serve                 # dashboard on http://127.0.0.1:6007
 agent-tap service install       # keep collector + dashboard running at login
 ```
 
 `agent-tap doctor` shows which harnesses were discovered, where data is stored, and source health.
+
+### Choosing harnesses (`agent-tap init`)
+
+`agent-tap init` (alias `setup`) scans your machine for `claude-code`, `codex`, `copilot-cli`, `hermes`, `raven`, `omniroute` and the bundled declarative adapters `aider` and `cline`, then asks:
+
+1. Which harnesses to enable (detected ones are pre-selected; press Enter to accept).
+2. Whether to override data paths (custom OmniRoute directory, WSL2 scan on Windows, declarative adapter directory).
+3. Whether to store full prompt/tool text locally (default: no).
+
+The answers are saved to `config.toml` as `enabled_harnesses`, `[paths]` and `store_prompt_text`; an existing file is backed up to `config.toml.bak` and unrelated keys are kept. The same flow runs automatically on the first `agent-tap run`, `serve` or `service install` when no `config.toml` exists and you are at a terminal.
+
+Scripts, CI and coding agents never hang: pass `--yes` or `--non-interactive` to accept defaults (detected harnesses, prompt text off) or `--harnesses claude-code,codex` to choose explicitly, e.g. `agent-tap service install --harnesses claude-code,codex`. Without a TTY no prompt is ever shown.
 
 ## Dashboard
 
@@ -40,6 +53,7 @@ agent-tap service install       # keep collector + dashboard running at login
 
 | Command | Purpose |
 |---|---|
+| `agent-tap init [--yes\|--non-interactive] [--harnesses h1,h2] [--store-prompts]` | Interactive setup (alias `setup`); also offered on first `run`/`serve`/`service install` |
 | `agent-tap doctor` | Show config, paths, discovered adapters, source health |
 | `agent-tap run [--once\|--watch]` | Collect spans once, or continuously with the dashboard (`daemon` is an alias for `run --watch`) |
 | `agent-tap serve [--port 6007]` | Dashboard only |
@@ -68,7 +82,7 @@ interval = 5.0                # poll seconds
 lookback_hours = 48.0
 retention_days = 90
 project_name = "agent-analytics"
-adapters = ["claude-code", "codex"]   # omit to use all discovered
+enabled_harnesses = ["claude-code", "codex"]   # omit to use all discovered (legacy key: adapters)
 adapters_dir = "~/.config/agent-tap/adapters"  # declarative *.toml adapters
 wsl_discovery = false         # AGENT_TAP_WSL=1: look for OmniRoute in WSL2 (Windows)
 

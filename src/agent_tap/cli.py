@@ -47,6 +47,36 @@ def _build_config(args: argparse.Namespace) -> Config:
     )
 
 
+def _split(v: str | None) -> list[str] | None:
+    return [h.strip() for h in v.split(",") if h.strip()] if v else None
+
+
+def cmd_init(cfg: Config, args: argparse.Namespace) -> int:
+    from .onboarding import can_prompt, run_init
+
+    interactive = not (args.yes or args.non_interactive) and can_prompt()
+    try:
+        run_init(cfg, harnesses=_split(args.harnesses), prompt_text=True if getattr(args, "store_prompts", False) else None, interactive=interactive)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def maybe_first_run_setup(cfg: Config, args: argparse.Namespace) -> Config:
+    """Offer setup once when no config.toml exists and a human is at the terminal."""
+    from .onboarding import can_prompt
+
+    if cfg.source is not None or getattr(args, "non_interactive", False):
+        return cfg
+    if _split(getattr(args, "harnesses", None)) or (can_prompt() and not getattr(args, "yes", False)):
+        rc = cmd_init(cfg, args)
+        if rc:
+            raise SystemExit(rc)
+        return load_config(None, {k: getattr(args, k, None) for k in ("spans_db", "state_db", "host", "port")})
+    return cfg
+
+
 def run_once(adapters: list, ctx, state, store, cutoff_ts: float) -> dict[str, Any]:
     from .adapters.base import run_adapters
 
@@ -189,6 +219,12 @@ def cmd_service(cfg: Config, args: argparse.Namespace) -> int:
     return int(code)
 
 
+def _setup_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--yes", "-y", action="store_true", help="Accept defaults without prompting")
+    p.add_argument("--non-interactive", action="store_true", help="Never prompt (safe for CI/scripts/agents)")
+    p.add_argument("--harnesses", help="Comma-separated harnesses to enable (skips the prompt)")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agent-tap", description="Local-first session analytics for AI coding agents")
     parser.add_argument("--version", action="version", version=f"agent-tap {__version__}")
@@ -206,14 +242,21 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--no-dashboard", action="store_true", help="Do not start the dashboard in watch mode")
         p.add_argument("--reset-watermarks", action="store_true")
         if name == "run":
+            _setup_flags(p)
             g = p.add_mutually_exclusive_group()
             g.add_argument("--once", action="store_true")
             g.add_argument("--watch", action="store_true")
 
     for name in ("serve", "serve-dashboard"):
         p = sub.add_parser(name, help="Run the dashboard")
+        _setup_flags(p)
         p.add_argument("--host")
         p.add_argument("--port", type=int)
+
+    for name in ("init", "setup"):
+        p = sub.add_parser(name, help="Interactive setup: choose harnesses, paths and prompt-text storage")
+        _setup_flags(p)
+        p.add_argument("--store-prompts", action="store_true", help="Opt in to storing prompt/tool text")
 
     p = sub.add_parser("query", help="Run read-only SQL or a preset (" + ", ".join(QUERY_PRESETS) + ")")
     p.add_argument("sql")
@@ -230,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("action", choices=["install", "status", "uninstall", "render"])
     p.add_argument("--os", choices=["windows", "macos", "linux"], default=None)
     p.add_argument("--dry-run", action="store_true")
+    _setup_flags(p)
 
     p = sub.add_parser("adapters", help="List or validate adapters")
     p.add_argument("action", choices=["list", "validate"])
@@ -242,6 +286,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "adapters" and args.action == "validate" and not args.file:
         parser.error("adapters validate requires a <file.toml>")
     cfg = _build_config(args)
+
+    if args.cmd == "init" or args.cmd == "setup":
+        return cmd_init(cfg, args)
+    first_run_cmds = args.cmd in ("serve", "serve-dashboard") or (args.cmd == "run" and not args.once) or (
+        args.cmd == "service" and args.action == "install" and not args.dry_run
+    )
+    if first_run_cmds:
+        cfg = maybe_first_run_setup(cfg, args)
 
     if args.cmd in ("daemon", "once"):
         args.once = args.cmd == "once"

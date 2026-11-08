@@ -24,7 +24,7 @@ class Config:
     lookback_hours: float = 48.0
     retention_days: int = 90
     project_name: str = "agent-analytics"
-    adapters: list[str] | None = None  # None = all discovered
+    enabled_harnesses: list[str] | None = None  # None = all discovered adapters
     adapters_dir: Path = field(default_factory=paths.adapters_dir)
     wsl_discovery: bool = False
     harness_dirs: dict[str, Path] = field(default_factory=dict)
@@ -53,9 +53,11 @@ def load_config(path: str | Path | None = None, overrides: dict[str, Any] | None
             if k in data:
                 setattr(cfg, k, Path(data[k]).expanduser())
         for k in ("store_prompt_text", "host", "port", "interval", "lookback_hours", "retention_days",
-                  "project_name", "adapters", "wsl_discovery"):
+                  "project_name", "enabled_harnesses", "wsl_discovery"):
             if k in data:
                 setattr(cfg, k, data[k])
+        if "enabled_harnesses" not in data and "adapters" in data:  # legacy key
+            cfg.enabled_harnesses = data["adapters"]
         cfg.harness_dirs = {k: Path(v).expanduser() for k, v in (data.get("paths") or {}).items()}
     env = os.environ.get
     if env("AGENT_TAP_SPANS_DB"):
