@@ -23,6 +23,8 @@ pipx install git+https://github.com/nareshh74/agent-tap   # straight from GitHub
 
 > The PyPI release is still pending. Until it lands, use the `git+https://...` line (it works with `uvx --from git+https://github.com/nareshh74/agent-tap agent-tap doctor` as well).
 
+**Claude Code users** can also install the bundled skill with one line: `/plugin marketplace add nareshh74/agent-tap`.
+
 **Step 1: choose what to monitor.**
 
 ```bash

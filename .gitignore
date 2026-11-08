@@ -19,3 +19,4 @@ build/
 .pytest_cache/
 /watchdog.py
 /start.ps1
+/marketing/

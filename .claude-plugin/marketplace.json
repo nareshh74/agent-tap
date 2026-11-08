@@ -1,0 +1,21 @@
+{
+  "name": "agent-tap-marketplace",
+  "owner": {
+    "name": "Naresh Kumar",
+    "url": "https://github.com/nareshh74"
+  },
+  "plugins": [
+    {
+      "name": "agent-tap",
+      "description": "Local-first operational analytics & failure correlation for AI coding agents (Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute).",
+      "version": "0.2.1",
+      "source": "./",
+      "author": {
+        "name": "Naresh Kumar",
+        "url": "https://github.com/nareshh74"
+      },
+      "license": "MIT",
+      "category": "observability"
+    }
+  ]
+}
