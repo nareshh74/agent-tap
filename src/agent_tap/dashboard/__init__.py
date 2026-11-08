@@ -574,7 +574,7 @@ def _index_html() -> str:
 
 def create_dashboard_app(config: Config | None = None) -> FastAPI:
     cfg = config or load_config()
-    app = FastAPI(title="agent-tap KPI Dashboard", version="0.2.0")
+    app = FastAPI(title="agent-tap KPI Dashboard", version=__import__("agent_tap").__version__)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

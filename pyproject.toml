@@ -4,19 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tap"
-version = "0.2.0"
-description = "Local-first, near-real-time session analytics for AI coding agents (Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute and more)"
+version = "0.2.1"
+description = "Local multi-agent usage analytics and operational debugging for Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven, OmniRoute, Aider and Cline: error taxonomy, parent-to-child trace correlation, cron monitoring, local SQLite, no cloud"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-keywords = ["agents", "observability", "claude-code", "codex", "copilot", "analytics", "sqlite"]
+keywords = ["ai-agents", "coding-agents", "claude-code", "codex", "github-copilot", "copilot-cli", "aider", "cline", "mcp", "llm-observability", "agent-analytics", "agent-debugging", "llmops", "sqlite", "cron-monitoring", "trace-correlation", "developer-tools", "local-first"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Monitoring",
+    "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = ["platformdirs>=3.0", "fastapi>=0.100", "uvicorn>=0.23"]
+
+[project.urls]
+Homepage = "https://github.com/nareshh74/agent-tap"
+Source = "https://github.com/nareshh74/agent-tap"
+Issues = "https://github.com/nareshh74/agent-tap/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.24", "build", "twine"]
