@@ -24,8 +24,8 @@ MAX_URL = 7000
 TRUNCATION_NOTE = "\n[truncated: run `agent-tap bug-report` and paste the full output]"
 
 SERVICE_OPTIONS = [
-    "claude-code", "codex", "copilot-cli", "hermes", "raven", "omniroute", "everos", "searxng",
-    "freellmapi", "firecrawl", "aider", "cline", "other service", "other harness",
+    "claude-code", "codex", "copilot-cli", "aider", "cline", "roo-code", "litellm", "ollama",
+    "vllm", "searxng", "firecrawl", "other service", "other harness",
 ]
 OS_OPTIONS = ["Windows", "macOS", "Linux", "WSL2"]
 INSTALL_OPTIONS = ["pipx", "uv tool", "pip", "from source", "other"]

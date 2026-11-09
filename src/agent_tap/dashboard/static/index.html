@@ -361,7 +361,7 @@
     <div class="section">
       <div class="section-header">
         <h2>Scheduled Tasks &amp; Crons</h2>
-        <span class="kpi-sub" id="cronSummaryText">OS scheduler (Task Scheduler / launchd / systemd / cron), Raven cron/heartbeat, Hermes cron</span>
+        <span class="kpi-sub" id="cronSummaryText">OS scheduler (Task Scheduler, launchd, systemd, crontab) and agent-native crons</span>
       </div>
       <div class="table-wrap">
         <table id="cronConfigTable">
@@ -471,7 +471,7 @@
     <div class="section">
       <div class="section-header">
         <h2>Crashes, Timeouts &amp; Operational Errors</h2>
-        <span class="kpi-sub">Includes deduplicated 5-min Hermes OAuth 400 buckets, OmniRoute 401/499/5xx, Raven 120s/600s timeouts & LiteLLM mid-stream errors</span>
+        <span class="kpi-sub">Includes deduplicated MCP OAuth 400 refresh buckets, gateway 401/499/5xx errors, 120s/600s timeouts &amp; LiteLLM mid-stream errors</span>
       </div>
       <div class="table-wrap">
         <table id="errorsTable">
@@ -503,8 +503,8 @@
           <thead>
             <tr>
               <th>Started (UTC)</th>
-              <th>Raven Parent Session</th>
-              <th>Raven Node (call_id)</th>
+              <th>Parent Session</th>
+              <th>Parent Node (call_id)</th>
               <th>Child Harness</th>
               <th>Child Session ID</th>
               <th>Confidence</th>
@@ -678,7 +678,7 @@
         { label: 'Configured Schedules', value: fmt(cr.summary.total_configured), sub: `${fmt(cr.summary.enabled_count)} enabled` },
         { label: 'Recent Runs', value: fmt(cr.summary.recent_runs_count), sub: `${fmt(cr.summary.recent_runs_with_errors)} with errors` },
         { label: 'Failed Schedules / Runs', value: `${fmt(cr.summary.failed_schedules)} / ${fmt(cr.summary.recent_runs_with_errors)}`, sub: `${fmt(cr.summary.approval_timeout_count)} approval timeouts • ${fmt(cr.summary.outlet_dropped_count)} dropped outlets` },
-        { label: 'Correlated Subagent Runs', value: fmt(s.correlated_runs), sub: `100% exact ID join (Raven → Child)` },
+        { label: 'Correlated Subagent Runs', value: fmt(s.correlated_runs), sub: `100% exact ID join (Parent → Child)` },
       ];
       document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
         <div class="kpi-card">

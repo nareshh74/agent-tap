@@ -1,6 +1,6 @@
 ---
 name: agent-tap
-description: Check what local AI coding agents and local services have been doing. Covers Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute, EverOS, SearXNG, FreeLLMAPI, Firecrawl and services you add. Use when asked about agent activity, failures, slow or failing tools, service health, scheduled jobs, or to open the agent-tap dashboard or file a bug report.
+description: Check what local AI coding agents and local services have been doing. Covers Claude Code, OpenAI Codex CLI, GitHub Copilot CLI, Aider, Cline, Roo Code, LiteLLM, Ollama, vLLM, SearXNG, Firecrawl and services you add. Use when asked about agent activity, failures, slow or failing tools, service health, scheduled jobs, or to open the agent-tap dashboard or file a bug report.
 ---
 
 # agent-tap
@@ -21,7 +21,7 @@ Do this only when the user asks for it.
 
 - `agent-tap init --non-interactive` writes `config.toml` without prompting. Add `--harnesses claude-code,codex,searxng` to choose explicitly. Plain `agent-tap init` asks the user to pick harnesses and services, paths and prompt storage.
 - To add a service, run `agent-tap onboard --name NAME --kind service --health-url URL`. You can add `--docker-container`, `--log-path` or `--process-name`. The command edits `config.toml`, so tell the user before you run it.
-- Built-in services are `everos`, `searxng`, `freellmapi` and `firecrawl`. Their defaults are in the README.
+- Built-in services include `searxng` and `firecrawl`, and `agent-tap onboard` adds gateways and services such as `litellm`, `ollama` or `vllm`. Their defaults are in the README.
 
 ## Read the results
 

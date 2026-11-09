@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tap"
-version = "0.3.0"
-description = "Local multi-agent usage analytics and operational debugging for Claude Code, Codex, GitHub Copilot CLI, Hermes, Raven, OmniRoute, Aider and Cline: error taxonomy, parent-to-child trace correlation, cron monitoring, local SQLite, no cloud"
+version = "0.3.1"
+description = "Local usage analytics, error debugging, trace correlation, and service monitoring for Claude Code, Codex, Copilot CLI, Aider, Cline, LiteLLM, Ollama, SearXNG, Firecrawl, and local AI services"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-keywords = ["ai-agents", "coding-agents", "claude-code", "codex", "github-copilot", "copilot-cli", "aider", "cline", "mcp", "llm-observability", "agent-analytics", "agent-debugging", "llmops", "sqlite", "cron-monitoring", "trace-correlation", "developer-tools", "local-first"]
+keywords = ["ai-agents", "coding-agents", "claude-code", "openai-codex", "github-copilot", "copilot-cli", "aider", "cline", "litellm", "ollama", "mcp", "model-context-protocol", "llm-observability", "agent-observability", "agent-monitoring", "agent-debugging", "llmops", "sqlite", "developer-tools", "opentelemetry"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

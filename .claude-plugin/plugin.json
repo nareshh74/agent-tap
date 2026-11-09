@@ -1,7 +1,7 @@
 {
   "name": "agent-tap",
-  "version": "0.3.0",
-  "description": "Local-first operational observability for AI coding agents (Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute). Correlates parent/child subagent runs, tool failures, timeouts, and scheduled crons in local SQLite.",
+  "version": "0.3.1",
+  "description": "Local usage analytics, error debugging, trace correlation, and service monitoring for AI coding agents (Claude Code, Codex, Copilot CLI, Aider, Cline) and local AI services (LiteLLM, Ollama, SearXNG, Firecrawl).",
   "author": {
     "name": "Naresh Kumar",
     "url": "https://github.com/nareshh74"

@@ -16,15 +16,14 @@ body:
         - claude-code
         - codex
         - copilot-cli
-        - hermes
-        - raven
-        - omniroute
-        - everos
-        - searxng
-        - freellmapi
-        - firecrawl
         - aider
         - cline
+        - roo-code
+        - litellm
+        - ollama
+        - vllm
+        - searxng
+        - firecrawl
         - other service
         - other harness
     validations:
@@ -55,7 +54,7 @@ body:
     attributes:
       label: agent-tap version
       description: Output of `agent-tap --version`.
-      placeholder: agent-tap 0.3.0
+      placeholder: agent-tap 0.3.1
     validations:
       required: true
   - type: dropdown

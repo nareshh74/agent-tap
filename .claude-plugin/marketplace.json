@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "agent-tap",
-      "description": "Local-first operational analytics & failure correlation for AI coding agents (Claude Code, Codex, Copilot CLI, Hermes, Raven, OmniRoute).",
-      "version": "0.3.0",
+      "description": "Local usage analytics, error debugging, trace correlation, and service monitoring for AI coding agents (Claude Code, Codex, Copilot CLI, Aider, Cline) and local AI services.",
+      "version": "0.3.1",
       "source": "./",
       "author": {
         "name": "Naresh Kumar",

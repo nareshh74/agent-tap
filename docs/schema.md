@@ -21,7 +21,7 @@ The `attributes` column is a nested JSON object. agent-tap un-flattens dotted ke
 
 | Key | Meaning |
 |---|---|
-| `harness` | Name of the source adapter or service, for example `raven`, `hermes`, `claude-code`, `codex`, `copilot-cli`, `omniroute`, `searxng` or a name you defined |
+| `harness` | Name of the source adapter or service, for example `claude-code`, `codex`, `copilot-cli`, `aider`, `cline`, `litellm`, `searxng` or a name you defined |
 | `service.kind` | `harness`, `gateway` or `service`. agent-tap sets it from the adapter, and the dashboard uses it to choose the section |
 | `service.name` | Name of the service on service probe spans |
 | `service.status` | `healthy`, `degraded` or `down` on service probe spans |
@@ -34,8 +34,8 @@ The `attributes` column is a nested JSON object. agent-tap un-flattens dotted ke
 | `tool.name`, `tool.id`, `tool.call_count`, `tool.failure_count`, `tool.duration_ms` | Tool calls |
 | `error.class`, `error.count`, `http.status_code`, `log.level`, `log.file` | Errors and spans built from logs |
 | `skill.names`, `skill.count` | Skill injection and read spans (`skill.inject`, `skill.read`) |
-| `hermes.profile` | Hermes profile name |
-| `raven.*`, `codex.*`, `copilot.*`, `omniroute.*` | Extra attributes of one harness |
+| `agent.profile` | Profile or workspace name when a harness uses multiple profiles |
+| `claude.*`, `codex.*`, `copilot.*`, `gateway.*` | Extra attributes of one harness or gateway |
 | `correlation.confidence` | How confidently agent-tap linked a session to its parent |
 | `input.value`, `output.value`, `tool.parameters` | Prompt and response text, stored only when `store_prompt_text` is on |
 
