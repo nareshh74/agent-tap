@@ -1,5 +1,7 @@
 import json
 import sqlite3
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from importlib import resources
@@ -13,6 +15,10 @@ import uvicorn
 from ..core.config import Config, load_config
 from ..core.schema import service_kind_for
 from ..platform.scheduler import collect_scheduled_tasks_and_crons
+
+_DIGEST_CACHE: dict[tuple[str, str, float, str], dict[str, Any]] = {}
+_DIGEST_FRESH_TTL = 4.0
+_DIGEST_STALE_TTL = 60.0
 
 
 def _percentile(sorted_vals: list[float], q: float) -> float:
@@ -630,9 +636,43 @@ def _index_html() -> str:
     return resources.files("agent_tap.dashboard").joinpath("static/index.html").read_text(encoding="utf-8")
 
 
+def _get_cached_digest(hours: float, harness_filter: str, cfg: Config) -> dict[str, Any]:
+    key = (str(cfg.spans_db), str(cfg.state_db), float(hours), str(harness_filter or "all"))
+    now = time.time()
+    entry = _DIGEST_CACHE.get(key)
+    if entry:
+        age = now - float(entry.get("ts") or 0.0)
+        if age < _DIGEST_FRESH_TTL:
+            return entry["payload"]
+        if age < _DIGEST_STALE_TTL:
+            if not entry.get("refreshing"):
+                entry["refreshing"] = True
+
+                def _bg() -> None:
+                    try:
+                        payload = compute_dashboard_payload(hours=hours, harness_filter=harness_filter, config=cfg)
+                        _DIGEST_CACHE[key] = {"ts": time.time(), "payload": payload, "refreshing": False}
+                    except Exception:
+                        entry["refreshing"] = False
+
+                threading.Thread(target=_bg, daemon=True).start()
+            return entry["payload"]
+    payload = compute_dashboard_payload(hours=hours, harness_filter=harness_filter, config=cfg)
+    _DIGEST_CACHE[key] = {"ts": time.time(), "payload": payload, "refreshing": False}
+    return payload
+
+
 def create_dashboard_app(config: Config | None = None) -> FastAPI:
     cfg = config or load_config()
     app = FastAPI(title="agent-tap KPI Dashboard", version=__import__("agent_tap").__version__)
+
+    def _prewarm() -> None:
+        try:
+            _get_cached_digest(24.0, "all", cfg)
+        except Exception:
+            pass
+
+    threading.Thread(target=_prewarm, daemon=True).start()
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -643,7 +683,7 @@ def create_dashboard_app(config: Config | None = None) -> FastAPI:
         hours: float = Query(24.0, ge=0.1, le=2200.0),
         harness: str = Query("all"),
     ) -> JSONResponse:
-        return JSONResponse(compute_dashboard_payload(hours=hours, harness_filter=harness, config=cfg))
+        return JSONResponse(_get_cached_digest(hours=hours, harness_filter=harness, cfg=cfg))
 
     @app.get("/api/trace/{trace_id}")
     def api_trace(

@@ -8,6 +8,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -35,7 +36,8 @@ def _fmt_utc_str(val: Any) -> str:
 
 DEFAULT_NAME_PATTERN = r"agent-?tap|hermes|raven|claude|codex|copilot|omniroute|agent"
 
-_OS_CACHE: dict[str, Any] = {"ts": 0.0, "key": "", "rows": []}
+_OS_CACHE: dict[str, Any] = {"ts": 0.0, "key": "", "rows": [], "refreshing": False}
+_OS_CACHE_TTL = 300.0
 
 
 def _harness_for(text: str) -> str:
@@ -202,14 +204,31 @@ def _run(cmd: list[str], timeout: int = 12) -> str:
         return ""
 
 
-def query_os_schedules(name_pattern: str = DEFAULT_NAME_PATTERN) -> list[dict[str, Any]]:
-    """Collect OS-level scheduled jobs for the current platform (cached 30s). Missing binaries yield nothing."""
-    now = time.time()
-    if now - _OS_CACHE["ts"] < 30.0 and _OS_CACHE["key"] == name_pattern:
-        return list(_OS_CACHE["rows"])
+def _fetch_os_schedules_sync(name_pattern: str = DEFAULT_NAME_PATTERN) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     if sys.platform == "win32":
-        rows += parse_schtasks_csv(_run(["schtasks", "/query", "/fo", "CSV", "/v"]), name_pattern)
+        ps_cmd = (
+            "Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\\Microsoft\\*' } | "
+            "ForEach-Object { "
+            "$i = $_ | Get-ScheduledTaskInfo -ErrorAction SilentlyContinue; "
+            "$a = ($_.Actions | ForEach-Object { \"$($_.Execute) $($_.Arguments)\".Trim() }) -join '; '; "
+            "[PSCustomObject]@{ "
+            "HostName = $env:COMPUTERNAME; "
+            "TaskName = \"$($_.TaskPath)$($_.TaskName)\"; "
+            "'Next Run Time' = if ($i -and $i.NextRunTime) { $i.NextRunTime.ToString('yyyy-MM-dd HH:mm:ss') } else { 'N/A' }; "
+            "Status = [string]$_.State; "
+            "'Last Run Time' = if ($i -and $i.LastRunTime) { $i.LastRunTime.ToString('yyyy-MM-dd HH:mm:ss') } else { 'N/A' }; "
+            "'Last Result' = if ($i) { [string]$i.LastTaskResult } else { '0' }; "
+            "'Task To Run' = $a; "
+            "'Schedule Type' = 'Scheduled'; "
+            "'Start Time' = 'N/A'; "
+            "'Repeat: Every' = 'N/A' "
+            "} } | ConvertTo-Csv -NoTypeInformation"
+        )
+        csv_out = _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], timeout=8)
+        if not csv_out:
+            csv_out = _run(["schtasks", "/query", "/fo", "CSV", "/v"], timeout=10)
+        rows += parse_schtasks_csv(csv_out, name_pattern)
     else:
         if sys.platform == "darwin":
             rows += parse_launchctl_list(_run(["launchctl", "list"]), name_pattern)
@@ -225,8 +244,36 @@ def query_os_schedules(name_pattern: str = DEFAULT_NAME_PATTERN) -> list[dict[st
         else:
             rows += parse_systemd_timers_json(_run(["systemctl", "--user", "list-timers", "--all", "--output=json"]), name_pattern)
         rows += parse_crontab(_run(["crontab", "-l"]), name_pattern)
-    _OS_CACHE.update(ts=now, key=name_pattern, rows=rows)
-    return list(rows)
+    return rows
+
+
+def _refresh_os_schedules_bg(name_pattern: str) -> None:
+    if _OS_CACHE.get("refreshing"):
+        return
+    _OS_CACHE["refreshing"] = True
+
+    def _worker() -> None:
+        try:
+            rows = _fetch_os_schedules_sync(name_pattern)
+            _OS_CACHE.update(ts=time.time(), key=name_pattern, rows=rows, refreshing=False)
+        except Exception:
+            _OS_CACHE["refreshing"] = False
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def query_os_schedules(name_pattern: str = DEFAULT_NAME_PATTERN) -> list[dict[str, Any]]:
+    """Collect OS-level scheduled jobs for the current platform (cached 300s, refreshed asynchronously)."""
+    now = time.time()
+    age = now - float(_OS_CACHE.get("ts") or 0.0)
+    if _OS_CACHE.get("key") == name_pattern and age < _OS_CACHE_TTL:
+        return list(_OS_CACHE["rows"])
+    if _OS_CACHE.get("ts", 0.0) > 0.0 and _OS_CACHE.get("key") == name_pattern:
+        _refresh_os_schedules_bg(name_pattern)
+        return list(_OS_CACHE["rows"])
+    _OS_CACHE.update(ts=now, key=name_pattern)
+    _refresh_os_schedules_bg(name_pattern)
+    return list(_OS_CACHE["rows"])
 
 
 def collect_scheduled_tasks_and_crons(
