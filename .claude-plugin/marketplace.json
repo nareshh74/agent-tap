@@ -8,7 +8,7 @@
     {
       "name": "agent-tap",
       "description": "Local usage analytics, error debugging, trace correlation, and service monitoring for AI coding agents (Claude Code, Codex, Copilot CLI, Aider, Cline) and local AI services.",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "source": "./",
       "author": {
         "name": "Naresh Kumar",

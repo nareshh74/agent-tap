@@ -7,6 +7,8 @@ description: Check what local AI coding agents and local services have been doin
 
 agent-tap stores spans from coding-agent harnesses and running services in a local SQLite file. It serves a dashboard at `http://127.0.0.1:6007`. Every monitored target is a service with a kind: `harness` (a coding agent), `gateway` (a model router or proxy) or `service` (anything else).
 
+Install or run directly with `pipx install agent-tap` or `uvx agent-tap`.
+
 ## Check what happened
 
 1. Run `agent-tap doctor`. It lists what agent-tap found, the database paths and the source health. If a source shows an error, report that error. Do not guess at a cause.

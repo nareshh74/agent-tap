@@ -22,7 +22,7 @@ Install from PyPI or run directly with `uvx`:
 
 ```bash
 pipx install agent-tap
-uvx agent-tap doctor
+uvx agent-tap
 ```
 
 You can also install straight from GitHub:
