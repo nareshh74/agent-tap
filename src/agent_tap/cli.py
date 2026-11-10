@@ -95,6 +95,13 @@ def _setup_runtime(cfg: Config):
 def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
     from .digest import prune_spans
 
+    if not args.once and not args.no_dashboard:
+        from .dashboard import run_dashboard_server
+
+        threading.Thread(
+            target=run_dashboard_server, kwargs={"host": cfg.host, "port": cfg.port, "config": cfg}, daemon=True
+        ).start()
+
     adapters, ctx, state, store = _setup_runtime(cfg)
     hours = args.hours if args.hours is not None else cfg.lookback_hours
     if getattr(args, "reset_watermarks", False):
@@ -108,12 +115,6 @@ def cmd_run(cfg: Config, args: argparse.Namespace) -> int:
         print(json.dumps({"status": "ok", "total_sent": store.total_sent, "sources": res}, indent=2))
         return 0
 
-    if not args.no_dashboard:
-        from .dashboard import run_dashboard_server
-
-        threading.Thread(
-            target=run_dashboard_server, kwargs={"host": cfg.host, "port": cfg.port, "config": cfg}, daemon=True
-        ).start()
     interval = args.interval if args.interval is not None else cfg.interval
     last_prune = 0.0
     try:

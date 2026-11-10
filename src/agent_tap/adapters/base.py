@@ -108,7 +108,13 @@ def run_adapters(
                 )
                 results[stage] = {"spans": sp, "errors": err}
         except Exception as e:  # one broken adapter must not stop the others
-            state.record_source_health(ad.name, last_error=str(e))
+            try:
+                state.record_source_health(ad.name, last_error=str(e))
+            except Exception:
+                pass
             results[ad.name] = {"spans": 0, "errors": 0, "exception": str(e)}
-        state.commit()
+        try:
+            state.commit()
+        except Exception:
+            pass
     return results

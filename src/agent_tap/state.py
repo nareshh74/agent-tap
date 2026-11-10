@@ -35,10 +35,11 @@ class StateStore:
 
         self.db_path = Path(db_path) if db_path else default_state_db()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.db_path), timeout=30.0)
+        self.conn = sqlite3.connect(str(self.db_path), timeout=60.0)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA synchronous=NORMAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self._init_schema()
 
     def _init_schema(self) -> None:
@@ -123,19 +124,23 @@ class StateStore:
         inode_or_ctime: Optional[int] = None,
     ) -> None:
         p = os.path.normcase(os.path.abspath(str(file_path)))
-        self.conn.execute(
-            """
-            INSERT INTO file_watermarks (source, file_path, inode_or_ctime, byte_offset, mtime_ns, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(file_path) DO UPDATE SET
-                source = excluded.source,
-                inode_or_ctime = excluded.inode_or_ctime,
-                byte_offset = excluded.byte_offset,
-                mtime_ns = excluded.mtime_ns,
-                updated_at = excluded.updated_at
-            """,
-            (source, p, inode_or_ctime, int(byte_offset), int(mtime_ns), time.time()),
-        )
+        try:
+            self.conn.execute(
+                """
+                INSERT INTO file_watermarks (source, file_path, inode_or_ctime, byte_offset, mtime_ns, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(file_path) DO UPDATE SET
+                    source = excluded.source,
+                    inode_or_ctime = excluded.inode_or_ctime,
+                    byte_offset = excluded.byte_offset,
+                    mtime_ns = excluded.mtime_ns,
+                    updated_at = excluded.updated_at
+                """,
+                (source, p, inode_or_ctime, int(byte_offset), int(mtime_ns), time.time()),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
     def get_db_watermark(self, source: str, db_path: str | Path, table_name: str) -> tuple[Optional[int], Optional[str]]:
         p = os.path.normcase(os.path.abspath(str(db_path)))
@@ -156,45 +161,53 @@ class StateStore:
         last_ts: Optional[str] = None,
     ) -> None:
         p = os.path.normcase(os.path.abspath(str(db_path)))
-        self.conn.execute(
-            """
-            INSERT INTO db_watermarks (source, db_path, table_name, last_rowid, last_ts, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(source, db_path, table_name) DO UPDATE SET
-                last_rowid = COALESCE(excluded.last_rowid, db_watermarks.last_rowid),
-                last_ts = COALESCE(excluded.last_ts, db_watermarks.last_ts),
-                updated_at = excluded.updated_at
-            """,
-            (source, p, table_name, last_rowid, last_ts, time.time()),
-        )
+        try:
+            self.conn.execute(
+                """
+                INSERT INTO db_watermarks (source, db_path, table_name, last_rowid, last_ts, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source, db_path, table_name) DO UPDATE SET
+                    last_rowid = COALESCE(excluded.last_rowid, db_watermarks.last_rowid),
+                    last_ts = COALESCE(excluded.last_ts, db_watermarks.last_ts),
+                    updated_at = excluded.updated_at
+                """,
+                (source, p, table_name, last_rowid, last_ts, time.time()),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
     def upsert_session_link(self, link: SessionLink) -> None:
-        self.conn.execute(
-            """
-            INSERT INTO session_links (
-                child_harness, child_session_id, raven_session_key, raven_call_id,
-                raven_node_span_id, trace_id, started_at_ms, ended_at_ms, confidence
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(child_harness, child_session_id, raven_call_id) DO UPDATE SET
-                raven_session_key = excluded.raven_session_key,
-                raven_node_span_id = excluded.raven_node_span_id,
-                trace_id = excluded.trace_id,
-                started_at_ms = COALESCE(excluded.started_at_ms, session_links.started_at_ms),
-                ended_at_ms = COALESCE(excluded.ended_at_ms, session_links.ended_at_ms),
-                confidence = excluded.confidence
-            """,
-            (
-                link.child_harness,
-                link.child_session_id,
-                link.raven_session_key,
-                link.raven_call_id,
-                link.raven_node_span_id,
-                link.trace_id,
-                link.started_at_ms,
-                link.ended_at_ms,
-                link.confidence,
-            ),
-        )
+        try:
+            self.conn.execute(
+                """
+                INSERT INTO session_links (
+                    child_harness, child_session_id, raven_session_key, raven_call_id,
+                    raven_node_span_id, trace_id, started_at_ms, ended_at_ms, confidence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(child_harness, child_session_id, raven_call_id) DO UPDATE SET
+                    raven_session_key = excluded.raven_session_key,
+                    raven_node_span_id = excluded.raven_node_span_id,
+                    trace_id = excluded.trace_id,
+                    started_at_ms = COALESCE(excluded.started_at_ms, session_links.started_at_ms),
+                    ended_at_ms = COALESCE(excluded.ended_at_ms, session_links.ended_at_ms),
+                    confidence = excluded.confidence
+                """,
+                (
+                    link.child_harness,
+                    link.child_session_id,
+                    link.raven_session_key,
+                    link.raven_call_id,
+                    link.raven_node_span_id,
+                    link.trace_id,
+                    link.started_at_ms,
+                    link.ended_at_ms,
+                    link.confidence,
+                ),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
     def resolve_session_link(
         self,
@@ -247,22 +260,29 @@ class StateStore:
         last_error: Optional[str] = None,
     ) -> None:
         now = time.time()
-        self.conn.execute(
-            """
-            INSERT INTO source_health (source, last_poll_at, last_event_at, spans_emitted, errors_emitted, last_error)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(source) DO UPDATE SET
-                last_poll_at = excluded.last_poll_at,
-                last_event_at = COALESCE(excluded.last_event_at, source_health.last_event_at),
-                spans_emitted = source_health.spans_emitted + excluded.spans_emitted,
-                errors_emitted = source_health.errors_emitted + excluded.errors_emitted,
-                last_error = excluded.last_error
-            """,
-            (source, now, last_event_at, spans_emitted, errors_emitted, last_error),
-        )
+        try:
+            self.conn.execute(
+                """
+                INSERT INTO source_health (source, last_poll_at, last_event_at, spans_emitted, errors_emitted, last_error)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source) DO UPDATE SET
+                    last_poll_at = excluded.last_poll_at,
+                    last_event_at = COALESCE(excluded.last_event_at, source_health.last_event_at),
+                    spans_emitted = source_health.spans_emitted + excluded.spans_emitted,
+                    errors_emitted = source_health.errors_emitted + excluded.errors_emitted,
+                    last_error = excluded.last_error
+                """,
+                (source, now, last_event_at, spans_emitted, errors_emitted, last_error),
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
     def commit(self) -> None:
-        self.conn.commit()
+        try:
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
     def close(self) -> None:
         self.conn.close()
