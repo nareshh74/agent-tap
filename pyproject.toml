@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-tap"
-version = "0.3.2"
+name = "ai-agent-tap"
+version = "0.3.3"
 description = "Local usage analytics, error debugging, trace correlation, and service monitoring for Claude Code, Codex, Copilot CLI, Aider, Cline, LiteLLM, Ollama, SearXNG, Firecrawl, and local AI services"
 readme = "README.md"
 license = { text = "MIT" }

@@ -7,7 +7,7 @@ description: Check what local AI coding agents and local services have been doin
 
 agent-tap stores spans from coding-agent harnesses and running services in a local SQLite file. It serves a dashboard at `http://127.0.0.1:6007`. Every monitored target is a service with a kind: `harness` (a coding agent), `gateway` (a model router or proxy) or `service` (anything else).
 
-Install or run directly with `pipx install agent-tap` or `uvx agent-tap`.
+Install with `pipx install ai-agent-tap` or `pip install ai-agent-tap`, or run directly with `uvx --from ai-agent-tap agent-tap`. The CLI command remains `agent-tap`.
 
 ## Check what happened
 

@@ -21,8 +21,9 @@ You need Python 3.11 or later on Linux, macOS, or Windows (including WSL2).
 Install from PyPI or run directly with `uvx`:
 
 ```bash
-pipx install agent-tap
-uvx agent-tap
+pipx install ai-agent-tap
+pip install ai-agent-tap
+uvx --from ai-agent-tap agent-tap
 ```
 
 You can also install straight from GitHub:
